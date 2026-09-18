@@ -15,6 +15,10 @@ export interface UserProfile {
   timezone: string;
   created_at: string;
   updated_at: string;
+  work_start?: string;
+  work_end?: string;
+  selected_goals?: string[];
+  onboarding_completed?: boolean;
 }
 
 export interface Project {
@@ -85,6 +89,7 @@ export interface Roadmap {
   id: string;
   user_id: string;
   template_id?: string;
+  template_key?: string;
   template_version: number;
   title: string;
   description?: string;

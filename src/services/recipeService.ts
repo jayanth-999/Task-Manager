@@ -1,4 +1,5 @@
 import type { Recipe, GroceryItem } from '../types';
+import { addLocalDays, getLocalDateString } from './dateUtils';
 
 export const BUILTIN_RECIPES: Recipe[] = [
   {
@@ -50,11 +51,38 @@ export const BUILTIN_RECIPES: Recipe[] = [
       { id: 'i9', recipe_id: 'rec-4', user_id: 'system', name: 'Eggs / Moong Sprouts', quantity: 2, unit: 'items', created_at: '' },
     ],
   },
+  {
+    id: 'rec-5', user_id: 'system', title: 'Chickpea & Cucumber Chaat Bowl', category: 'Plant Protein',
+    instructions: 'Toss cooked chickpeas with cucumber, tomato, onion, lemon, cumin and coriander. Serve chilled.', created_at: new Date().toISOString(),
+    ingredients: [{ id: 'i10', recipe_id: 'rec-5', user_id: 'system', name: 'Cooked Chickpeas', quantity: 1, unit: 'cup', created_at: '' }, { id: 'i11', recipe_id: 'rec-5', user_id: 'system', name: 'Cucumber, Tomato & Lemon', quantity: 1, unit: 'set', created_at: '' }],
+  },
+  {
+    id: 'rec-6', user_id: 'system', title: 'Overnight Oats with Banana & Seeds', category: 'Breakfast',
+    instructions: 'Soak oats in milk or yogurt overnight. Top with banana, chia seeds and cinnamon before eating.', created_at: new Date().toISOString(),
+    ingredients: [{ id: 'i12', recipe_id: 'rec-6', user_id: 'system', name: 'Rolled Oats', quantity: 0.5, unit: 'cup', created_at: '' }, { id: 'i13', recipe_id: 'rec-6', user_id: 'system', name: 'Milk / Yogurt, Banana & Chia Seeds', quantity: 1, unit: 'set', created_at: '' }],
+  },
+  {
+    id: 'rec-7', user_id: 'system', title: 'Lemon Garlic Chicken / Soy Chunk Rice', category: 'High Protein',
+    instructions: 'Pan-sear chicken or soy chunks with garlic and lemon. Serve with rice and a quick side salad.', created_at: new Date().toISOString(),
+    ingredients: [{ id: 'i14', recipe_id: 'rec-7', user_id: 'system', name: 'Chicken / Soy Chunks', quantity: 200, unit: 'grams', created_at: '' }, { id: 'i15', recipe_id: 'rec-7', user_id: 'system', name: 'Rice, Lemon & Garlic', quantity: 1, unit: 'set', created_at: '' }],
+  },
+  {
+    id: 'rec-8', user_id: 'system', title: 'Vegetable Moong Dal Khichdi', category: 'Comforting Healthy',
+    instructions: 'Pressure cook rice, moong dal, mixed vegetables, turmeric and cumin. Finish with lemon or yogurt.', created_at: new Date().toISOString(),
+    ingredients: [{ id: 'i16', recipe_id: 'rec-8', user_id: 'system', name: 'Moong Dal & Rice', quantity: 1, unit: 'cup', created_at: '' }, { id: 'i17', recipe_id: 'rec-8', user_id: 'system', name: 'Mixed Vegetables', quantity: 250, unit: 'grams', created_at: '' }],
+  },
 ];
 
 export class RecipeService {
   static getRecipes(): Recipe[] {
     return BUILTIN_RECIPES;
+  }
+
+  /** A deterministic daily rotation, with an optional manual refresh round. */
+  static getDailySuggestions(date = new Date().toISOString().slice(0, 10), round = 0): Recipe[] {
+    const dayNumber = Math.floor(new Date(`${date}T12:00:00`).getTime() / 86400000);
+    const start = Math.abs(dayNumber + round * 3) % BUILTIN_RECIPES.length;
+    return Array.from({ length: Math.min(3, BUILTIN_RECIPES.length) }, (_, index) => BUILTIN_RECIPES[(start + index) % BUILTIN_RECIPES.length]);
   }
 
   static generateGroceryItems(recipeIds: string[]): GroceryItem[] {
@@ -69,7 +97,7 @@ export class RecipeService {
           name: ing.name,
           quantity: `${ing.quantity} ${ing.unit}`,
           is_purchased: false,
-          target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+          target_date: addLocalDays(getLocalDateString(), 1),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });

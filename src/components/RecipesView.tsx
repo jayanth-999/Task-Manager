@@ -1,14 +1,22 @@
-import React, { useState } from 'react';
-import { Utensils, ShoppingCart, Check, Bell } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Utensils, ShoppingCart, Check, Bell, RefreshCw } from 'lucide-react';
 import { RecipeService } from '../services/recipeService';
 import type { GroceryItem } from '../types';
 
 export const RecipesView: React.FC = () => {
-  const recipes = RecipeService.getRecipes();
-  const [selectedRecipes, setSelectedRecipes] = useState<string[]>([recipes[0].id, recipes[1].id]);
-  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>(
-    RecipeService.generateGroceryItems([recipes[0].id, recipes[1].id])
-  );
+  const [suggestionRound, setSuggestionRound] = useState(0);
+  const recipes = useMemo(() => RecipeService.getDailySuggestions(undefined, suggestionRound), [suggestionRound]);
+  const initialRecipeIds = useMemo(() => RecipeService.getDailySuggestions(undefined, 0).slice(0, 2).map(recipe => recipe.id), []);
+  const [selectedRecipes, setSelectedRecipes] = useState<string[]>(initialRecipeIds);
+  const [groceryItems, setGroceryItems] = useState<GroceryItem[]>(() => RecipeService.generateGroceryItems(initialRecipeIds));
+
+  const refreshSuggestions = () => {
+    const nextRound = suggestionRound + 1;
+    const defaults = RecipeService.getDailySuggestions(undefined, nextRound).slice(0, 2).map(recipe => recipe.id);
+    setSuggestionRound(nextRound);
+    setSelectedRecipes(defaults);
+    setGroceryItems(RecipeService.generateGroceryItems(defaults));
+  };
 
   const toggleRecipeSelection = (recipeId: string) => {
     const updated = selectedRecipes.includes(recipeId)
@@ -26,13 +34,22 @@ export const RecipesView: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+      {/* Read-Only Banner */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem',
+        padding: '0.7rem 1rem', borderRadius: 'var(--radius-sm)',
+        background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)',
+        fontSize: '0.82rem', color: 'var(--accent-warning)',
+      }}>
+        📖 <strong>Reference Guide</strong> — Changes here are temporary and won't be saved across page refreshes.
+      </div>
       {/* Header */}
       <div className="glass-panel" style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <Utensils size={22} color="var(--accent-primary)" />
           <div>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Recipe Suggestions & Advance Grocery Planner</h2>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Simple 4+ Healthy Recipes & Day-Before Shopping Alerts</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Fresh daily meal ideas with a ready-to-use grocery list</span>
           </div>
         </div>
       </div>
@@ -50,7 +67,13 @@ export const RecipesView: React.FC = () => {
 
       {/* Recipe Suggestions Grid */}
       <div className="glass-panel" style={{ padding: '1.2rem' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Select Meals for Tomorrow</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Today’s rotating suggestions</h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>Choose meals for tomorrow, or refresh for a different set.</p>
+          </div>
+          <button className="btn-secondary" onClick={refreshSuggestions} style={{ fontSize: '0.78rem', gap: '0.3rem' }}><RefreshCw size={14} /> New ideas</button>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
           {recipes.map(recipe => {
             const isSelected = selectedRecipes.includes(recipe.id);
@@ -125,4 +148,3 @@ export const RecipesView: React.FC = () => {
     </div>
   );
 };
-

@@ -1,5 +1,21 @@
-import { supabase } from './supabaseClient';
-import type { Roadmap, RoadmapPhase, RoadmapMilestone } from '../types';
+import { SyncEngine } from './syncEngine';
+import { supabase, isCloudConfigured } from './supabaseClient';
+import type { Task, Roadmap, RoadmapPhase, RoadmapMilestone } from '../types';
+import { throwIfSupabaseError } from './supabaseResult';
+import { getLocalDateString } from './dateUtils';
+
+export interface RoadmapImport {
+  title: string;
+  description?: string;
+  category?: string;
+  duration_months: number;
+  is_primary?: boolean;
+  phases: Array<{
+    title: string;
+    description?: string;
+    milestones: Array<{ title: string; description?: string; target_day?: number }>;
+  }>;
+}
 
 export const BUILTIN_TEMPLATES = [
   {
@@ -69,8 +85,10 @@ export const BUILTIN_TEMPLATES = [
 ];
 
 export class RoadmapService {
-  static calculateRoadmapProgress(roadmap: Roadmap): number {
-    if (!roadmap.phases || roadmap.phases.length === 0) return 0;
+  static calculateRoadmapProgress(roadmap: Roadmap): { percentage: number; totalMilestones: number; completedMilestones: number } {
+    if (!roadmap.phases || roadmap.phases.length === 0) {
+      return { percentage: 0, totalMilestones: 0, completedMilestones: 0 };
+    }
     let totalMilestones = 0;
     let completedMilestones = 0;
 
@@ -81,33 +99,38 @@ export class RoadmapService {
       });
     });
 
-    if (totalMilestones === 0) return 0;
-    return Math.round((completedMilestones / totalMilestones) * 100);
+    if (totalMilestones === 0) {
+      return { percentage: 0, totalMilestones: 0, completedMilestones: 0 };
+    }
+    return {
+      percentage: Math.round((completedMilestones / totalMilestones) * 100),
+      totalMilestones,
+      completedMilestones,
+    };
   }
 
   static async getRoadmaps(userId: string): Promise<Roadmap[]> {
-    if (userId === 'guest-local-user') {
-      const raw = localStorage.getItem('apex_roadmaps');
-      if (!raw) {
-        // Initialize default 4-Month DevOps + AI Career Roadmap
-        const defaultRoadmap = await this.createRoadmapFromTemplate(userId, 'tpl-devops-ai-4m');
-        return [defaultRoadmap];
+    let roadmaps: Roadmap[] = [];
+
+    if (!isCloudConfigured || userId === 'guest-local-user') {
+      roadmaps = await SyncEngine.getLocalItems<Roadmap>('roadmaps', userId);
+    } else {
+      const { data, error } = await supabase
+        .from('roadmaps')
+        .select('*, roadmap_phases(*, roadmap_milestones(*))')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        roadmaps = await SyncEngine.getLocalItems<Roadmap>('roadmaps', userId);
+      } else {
+        roadmaps = data ?? [];
+        await SyncEngine.bulkSaveLocalItemsWithoutQueue('roadmaps', roadmaps);
       }
-      return JSON.parse(raw);
     }
 
-    const { data, error } = await supabase
-      .from('roadmaps')
-      .select('*, roadmap_phases(*, roadmap_milestones(*))')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false });
-
-    if (error || !data || data.length === 0) {
-      const defaultRoadmap = await this.createRoadmapFromTemplate(userId, 'tpl-devops-ai-4m');
-      return [defaultRoadmap];
-    }
-    return data;
+    return roadmaps;
   }
 
   static async getActiveMilestone(userId: string): Promise<{
@@ -116,7 +139,9 @@ export class RoadmapService {
     milestone: RoadmapMilestone;
   } | null> {
     const roadmaps = await this.getRoadmaps(userId);
-    const primary = roadmaps.find(r => r.is_primary && r.status === 'active') || roadmaps[0];
+    // Only select roadmaps with status === 'active'
+    const activeRoadmaps = roadmaps.filter(r => r.status === 'active');
+    const primary = activeRoadmaps.find(r => r.is_primary) || activeRoadmaps[0];
     if (!primary || !primary.phases) return null;
 
     for (const phase of primary.phases) {
@@ -135,40 +160,110 @@ export class RoadmapService {
     const roadmaps = await this.getRoadmaps(userId);
     let targetRoadmap: Roadmap | null = null;
 
-    roadmaps.forEach(r => {
-      r.phases?.forEach(p => {
-        p.milestones?.forEach(m => {
+    for (const r of roadmaps) {
+      for (const p of r.phases || []) {
+        for (const m of p.milestones || []) {
           if (m.id === milestoneId) {
             m.status = 'completed';
             m.completion_percentage = 100;
             targetRoadmap = r;
           }
-        });
-      });
-    });
-
-    if (targetRoadmap && userId === 'guest-local-user') {
-      localStorage.setItem('apex_roadmaps', JSON.stringify(roadmaps));
+        }
+      }
     }
+
+    if (targetRoadmap) {
+      const updatedRoadmap: Roadmap = targetRoadmap;
+      updatedRoadmap.updated_at = new Date().toISOString();
+      await SyncEngine.saveLocalItem('roadmaps', updatedRoadmap, 'UPDATE');
+
+      if (isCloudConfigured && userId !== 'guest-local-user') {
+        try {
+          const result = await supabase
+            .from('roadmap_milestones')
+            .update({ status: 'completed', completion_percentage: 100 })
+            .eq('id', milestoneId);
+          throwIfSupabaseError(result);
+        } catch (err) {
+          console.warn('Failed cloud sync for milestone completion:', err);
+        }
+      }
+    }
+
     return targetRoadmap;
+  }
+
+  /** Hide a roadmap while keeping its completed history recoverable in storage. */
+  static async deleteRoadmap(userId: string, roadmapId: string): Promise<void> {
+    const deletedAt = new Date().toISOString();
+    const roadmap = await SyncEngine.getLocalItem<Roadmap>('roadmaps', roadmapId);
+    if (roadmap?.user_id === userId) {
+      roadmap.deleted_at = deletedAt;
+      roadmap.updated_at = deletedAt;
+      await SyncEngine.saveLocalItem('roadmaps', roadmap);
+    }
+
+    // Preserve a planned task, but remove the reference to a roadmap that no longer exists.
+    if (roadmap) {
+      const tasks = await SyncEngine.getLocalItems<Task>('tasks', userId);
+      for (const task of tasks) {
+        const belongsToRoadmap = roadmap.phases?.some(phase => phase.milestones?.some(milestone => milestone.id === task.milestone_id));
+        if (belongsToRoadmap) {
+          task.milestone_id = undefined;
+          task.updated_at = new Date().toISOString();
+          await SyncEngine.saveLocalItem('tasks', task);
+        }
+      }
+    }
+
+    if (isCloudConfigured && userId !== 'guest-local-user') {
+      try {
+        const { data, error } = await supabase
+          .from('roadmaps')
+          .update({ deleted_at: deletedAt, updated_at: deletedAt })
+          .eq('id', roadmapId)
+          .eq('user_id', userId)
+          .select('id, deleted_at')
+          .maybeSingle();
+        throwIfSupabaseError({ error });
+        if (!data?.deleted_at) throw new Error(`Roadmap ${roadmapId} was not deleted in Supabase`);
+      } catch (err) {
+        console.warn('Queued roadmap deletion for sync:', err);
+      }
+    }
   }
 
   static async createRoadmapFromTemplate(userId: string, templateId: string, customTitle?: string): Promise<Roadmap> {
     const tpl = BUILTIN_TEMPLATES.find(t => t.id === templateId) || BUILTIN_TEMPLATES[0];
+    return this.createRoadmapFromData(userId, {
+      title: customTitle || tpl.title,
+      description: tpl.description,
+      category: tpl.category,
+      duration_months: tpl.duration_months,
+      phases: tpl.structure.phases,
+    }, tpl.id);
+  }
+
+  /** Creates a roadmap from the portable JSON format exposed in the UI. */
+  static async createRoadmapFromData(userId: string, input: RoadmapImport, templateId?: string): Promise<Roadmap> {
+    if (!input.title?.trim() || !Number.isFinite(input.duration_months) || input.duration_months < 1 || !input.phases?.length) {
+      throw new Error('A roadmap needs a title, a duration of at least one month, and one or more phases.');
+    }
     const startDate = new Date();
     const endDate = new Date();
-    endDate.setMonth(endDate.getMonth() + tpl.duration_months);
+    endDate.setMonth(endDate.getMonth() + input.duration_months);
 
     const roadmapId = crypto.randomUUID();
 
-    const phases: RoadmapPhase[] = tpl.structure.phases.map((p, pIdx) => {
+    const phases: RoadmapPhase[] = input.phases.map((p, pIdx) => {
       const phaseId = crypto.randomUUID();
       return {
         id: phaseId,
         roadmap_id: roadmapId,
         user_id: userId,
         title: p.title,
-        phase_order: p.phase_order,
+        description: p.description,
+        phase_order: pIdx + 1,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         milestones: p.milestones.map((m, mIdx) => ({
@@ -176,6 +271,10 @@ export class RoadmapService {
           phase_id: phaseId,
           user_id: userId,
           title: m.title,
+          description: m.description,
+          target_date: typeof m.target_day === 'number'
+            ? getLocalDateString(new Date(startDate.getTime() + Math.max(0, m.target_day - 1) * 86400000))
+            : undefined,
           status: pIdx === 0 && mIdx === 0 ? 'in_progress' : 'pending',
           completion_percentage: 0,
           created_at: new Date().toISOString(),
@@ -184,17 +283,36 @@ export class RoadmapService {
       };
     });
 
+    // Demote any existing primary roadmaps for this user
+    const existingRoadmaps = await this.getRoadmaps(userId);
+    for (const r of existingRoadmaps) {
+      if (r.is_primary) {
+        r.is_primary = false;
+        r.updated_at = new Date().toISOString();
+        await SyncEngine.saveLocalItem('roadmaps', r, 'UPDATE');
+        if (isCloudConfigured && userId !== 'guest-local-user') {
+          try {
+            const res = await supabase.from('roadmaps').update({ is_primary: false, updated_at: r.updated_at }).eq('id', r.id).eq('user_id', userId);
+            throwIfSupabaseError(res);
+          } catch (e) {
+            console.warn('Failed to demote old primary roadmap in cloud:', e);
+          }
+        }
+      }
+    }
+
     const newRoadmap: Roadmap = {
       id: roadmapId,
       user_id: userId,
-      template_id: tpl.id,
+      template_id: undefined, // Leave undefined so DB UUID column does not fail on string IDs
+      template_key: templateId,
       template_version: 1,
-      title: customTitle || tpl.title,
-      description: tpl.description,
-      category: tpl.category,
-      duration_months: tpl.duration_months,
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
+      title: input.title.trim(),
+      description: input.description,
+      category: input.category || 'Personal roadmap',
+      duration_months: input.duration_months,
+      start_date: getLocalDateString(startDate),
+      end_date: getLocalDateString(endDate),
       status: 'active',
       is_primary: true,
       color_code: '#3B82F6',
@@ -203,15 +321,119 @@ export class RoadmapService {
       phases,
     };
 
-    if (userId === 'guest-local-user') {
-      const raw = localStorage.getItem('apex_roadmaps');
-      const existing: Roadmap[] = raw ? JSON.parse(raw) : [];
-      existing.unshift(newRoadmap);
-      localStorage.setItem('apex_roadmaps', JSON.stringify(existing));
-      return newRoadmap;
+    await SyncEngine.saveLocalItem('roadmaps', newRoadmap, 'INSERT');
+
+    if (isCloudConfigured && userId !== 'guest-local-user') {
+      try {
+        // Save roadmap record
+        const { phases: _, ...roadmapRecord } = newRoadmap;
+        const resRoadmap = await supabase.from('roadmaps').insert(roadmapRecord);
+        throwIfSupabaseError(resRoadmap);
+        for (const phase of phases) {
+          const { milestones: phaseMilestones, ...phaseRecord } = phase;
+          const resPhase = await supabase.from('roadmap_phases').insert(phaseRecord);
+          throwIfSupabaseError(resPhase);
+          if (phaseMilestones && phaseMilestones.length > 0) {
+            const resMilestones = await supabase.from('roadmap_milestones').insert(phaseMilestones);
+            throwIfSupabaseError(resMilestones);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed cloud save for roadmap, cached locally:', err);
+      }
     }
 
-    await supabase.from('roadmaps').insert(newRoadmap);
     return newRoadmap;
+  }
+
+  static parseRoadmapImport(json: string): RoadmapImport {
+    let value: unknown;
+    try {
+      value = JSON.parse(json);
+    } catch {
+      throw new Error('The file is not valid JSON. Download the template and keep its structure.');
+    }
+    const data = value as Partial<RoadmapImport>;
+    if (!data || typeof data.title !== 'string' || !Array.isArray(data.phases)) {
+      throw new Error('The roadmap must include a title and a phases list.');
+    }
+    const duration = Number(data.duration_months);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 120) {
+      throw new Error('duration_months must be a whole number between 1 and 120.');
+    }
+    const phases = data.phases.map((phase, index) => {
+      if (!phase || typeof phase.title !== 'string' || !Array.isArray(phase.milestones) || phase.milestones.length === 0) {
+        throw new Error(`Phase ${index + 1} needs a title and at least one milestone.`);
+      }
+      return {
+        title: phase.title,
+        description: phase.description,
+        milestones: phase.milestones.map((milestone, milestoneIndex) => {
+          if (!milestone || typeof milestone.title !== 'string' || !milestone.title.trim()) {
+            throw new Error(`Milestone ${milestoneIndex + 1} in phase ${index + 1} needs a title.`);
+          }
+          const targetDay = milestone.target_day === undefined ? undefined : Number(milestone.target_day);
+          if (targetDay !== undefined && (!Number.isInteger(targetDay) || targetDay < 1)) {
+            throw new Error('target_day must be a positive whole number.');
+          }
+          return { title: milestone.title.trim(), description: milestone.description, target_day: targetDay };
+        }),
+      };
+    });
+    return { title: data.title.trim(), description: data.description, category: data.category, duration_months: duration, phases };
+  }
+
+  static async linkMilestoneToDailyTask(userId: string, milestoneId: string, dueDate: string): Promise<Task | null> {
+    const roadmaps = await this.getRoadmaps(userId);
+    let targetMilestone: RoadmapMilestone | null = null;
+    let targetRoadmap: Roadmap | null = null;
+
+    for (const r of roadmaps) {
+      for (const p of r.phases || []) {
+        for (const m of p.milestones || []) {
+          if (m.id === milestoneId) {
+            targetMilestone = m;
+            targetRoadmap = r;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!targetMilestone) return null;
+
+    // “Add to today” is safe to click repeatedly; it must not create duplicate work.
+    const existingTasks = await SyncEngine.getLocalItems<Task>('tasks', userId);
+    const existing = existingTasks.find(task => task.milestone_id === milestoneId && task.due_date === dueDate && !task.deleted_at);
+    if (existing) return existing;
+
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      title: `🎯 ${targetMilestone.title}`,
+      description: `Roadmap Target from "${targetRoadmap?.title || 'Career Goal'}"`,
+      milestone_id: milestoneId,
+      due_date: dueDate,
+      status: 'todo',
+      priority: 'high',
+      category: 'learning',
+      scheduled_start: '17:00',
+      scheduled_end: '18:00',
+      version: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    await SyncEngine.saveLocalItem('tasks', newTask);
+
+    if (isCloudConfigured && userId !== 'guest-local-user') {
+      try {
+        await supabase.from('tasks').insert(newTask);
+      } catch (err) {
+        console.warn('Queued roadmap milestone task sync:', err);
+      }
+    }
+
+    return newTask;
   }
 }

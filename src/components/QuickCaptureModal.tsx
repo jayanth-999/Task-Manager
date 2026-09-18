@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import { TaskService } from '../services/taskService';
 
@@ -15,6 +15,15 @@ export const QuickCaptureModal: React.FC<QuickCaptureModalProps> = ({
 }) => {
   const [input, setInput] = useState('');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const parsed = input ? TaskService.parseNaturalLanguageInput(input) : null;
@@ -29,13 +38,29 @@ export const QuickCaptureModal: React.FC<QuickCaptureModalProps> = ({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div className="glass-panel" style={{ width: '100%', maxWidth: '500px', padding: '1.5rem' }}>
+    <div
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-capture-modal-title"
+        className="glass-panel"
+        style={{ width: '100%', maxWidth: '500px', padding: '1.5rem' }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <h3 id="quick-capture-modal-title" style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Sparkles size={18} color="var(--accent-primary)" /> Natural Language Quick Capture
           </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dialog"
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+          >
             <X size={20} />
           </button>
         </div>

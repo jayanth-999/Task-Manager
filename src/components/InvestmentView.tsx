@@ -1,16 +1,31 @@
 import React, { useState } from 'react';
 import { TrendingUp, ExternalLink, CheckSquare } from 'lucide-react';
 import { INVESTMENT_RESOURCES, DAILY_INVESTMENT_CHECKLIST } from '../services/investmentService';
+import { dateKey } from '../services/dateUtils';
 
 export const InvestmentView: React.FC = () => {
-  const [checklistState, setChecklistState] = useState<boolean[]>(
-    new Array(DAILY_INVESTMENT_CHECKLIST.length).fill(false)
-  );
+  const todayDateStr = dateKey();
+  const storageKey = `apex_invest_check_${todayDateStr}`;
+
+  const [checklistState, setChecklistState] = useState<boolean[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed reading investment checklist state:', e);
+    }
+    return new Array(DAILY_INVESTMENT_CHECKLIST.length).fill(false);
+  });
 
   const toggleCheck = (idx: number) => {
     const next = [...checklistState];
     next[idx] = !next[idx];
     setChecklistState(next);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch (e) {
+      console.warn('Failed saving investment checklist state:', e);
+    }
   };
 
   return (
@@ -40,7 +55,12 @@ export const InvestmentView: React.FC = () => {
               className="glass-card"
               style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', cursor: 'pointer', padding: '0.7rem 1rem' }}
             >
-              <input type="checkbox" checked={checklistState[idx]} onChange={() => {}} style={{ cursor: 'pointer' }} />
+              <input
+                type="checkbox"
+                checked={checklistState[idx]}
+                onChange={() => toggleCheck(idx)}
+                style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent-success)' }}
+              />
               <span className={checklistState[idx] ? 'task-completed-text' : ''} style={{ fontSize: '0.9rem' }}>
                 {item}
               </span>

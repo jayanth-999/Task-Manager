@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { BookOpen, Code, Terminal, CheckCircle2 } from 'lucide-react';
+import { getLocalDateString } from '../services/dateUtils';
 
 export const TechLearningView: React.FC = () => {
-  const [learningLog, setLearningLog] = useState([
-    { id: '1', date: '2026-09-16', aiTopic: 'MCP Server Architecture & Tool Calling', devopsTopic: 'Python Refactoring: Native Generators & Itertools without Copilot', duration: 60, isCompleted: true },
-    { id: '2', date: '2026-09-15', aiTopic: 'RAG Chunking Strategies & Vector Embeddings', devopsTopic: 'Kubernetes Pod Ingress Routing & Helm Charts', duration: 60, isCompleted: true },
-  ]);
+  const [learningLog, setLearningLog] = useState<Array<{ id: string; date: string; aiTopic: string; devopsTopic: string; duration: number; isCompleted: boolean }>>(() => {
+    try {
+      const saved = localStorage.getItem('apex_learning_logs');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Failed to parse learning logs from localStorage:', e);
+    }
+    return [];
+  });
 
   const [aiInput, setAiInput] = useState('');
   const [devopsInput, setDevopsInput] = useState('');
@@ -13,23 +19,36 @@ export const TechLearningView: React.FC = () => {
   const handleLogLearning = (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiInput.trim() && !devopsInput.trim()) return;
-    setLearningLog(prev => [
-      {
-        id: crypto.randomUUID(),
-        date: new Date().toISOString().split('T')[0],
-        aiTopic: aiInput || 'AI Agent / RAG Study',
-        devopsTopic: devopsInput || 'DevOps & Pure Python Practice',
-        duration: 60,
-        isCompleted: true,
-      },
-      ...prev,
-    ]);
+    const newEntry = {
+      id: crypto.randomUUID(),
+      date: getLocalDateString(),
+      aiTopic: aiInput || 'AI Agent / RAG Study',
+      devopsTopic: devopsInput || 'DevOps & Pure Python Practice',
+      duration: 60,
+      isCompleted: true,
+    };
+    const next = [newEntry, ...learningLog];
+    setLearningLog(next);
+    try {
+      localStorage.setItem('apex_learning_logs', JSON.stringify(next));
+    } catch (e) {
+      console.warn('Failed to save learning log:', e);
+    }
     setAiInput('');
     setDevopsInput('');
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+      {/* Learning Status Banner */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem',
+        padding: '0.7rem 1rem', borderRadius: 'var(--radius-sm)',
+        background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)',
+        fontSize: '0.82rem', color: 'var(--accent-primary)',
+      }}>
+        🚀 <strong>1-Hour Daily Study Plan</strong> — Log your daily AI and DevOps progress here. Persisted and tracked for your 4-month goal.
+      </div>
       {/* Header */}
       <div className="glass-panel" style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
@@ -91,6 +110,7 @@ export const TechLearningView: React.FC = () => {
       {/* Learning Logs History */}
       <div className="glass-panel" style={{ padding: '1.2rem' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.8rem' }}>Recent Learning Log History</h3>
+        {learningLog.length === 0 && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No learning sessions logged yet. Add the first one above.</p>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           {learningLog.map(log => (
             <div key={log.id} className="glass-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
@@ -111,4 +131,3 @@ export const TechLearningView: React.FC = () => {
     </div>
   );
 };
-

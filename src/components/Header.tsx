@@ -1,9 +1,12 @@
 import React from 'react';
-import { Flame, Plus, User, Zap, Moon, Sun } from 'lucide-react';
+import { Flame, Plus, User, Zap, Moon, Sun, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import type { UserProfile } from '../types';
+import type { SyncStatus } from '../services/syncEngine';
 
 interface HeaderProps {
   user: UserProfile;
+  streak?: number;
+  syncStatus?: SyncStatus;
   onOpenQuickCapture: () => void;
   onOpenAuthModal: () => void;
   isDarkMode: boolean;
@@ -12,43 +15,70 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   user,
+  streak = 0,
+  syncStatus,
   onOpenQuickCapture,
   onOpenAuthModal,
   isDarkMode,
   onToggleTheme,
 }) => {
   return (
-    <header className="glass-panel" style={{ padding: '0.8rem 1.5rem', margin: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-        <div style={{ background: 'var(--accent-gradient)', padding: '0.5rem', borderRadius: '10px', display: 'flex' }}>
-          <Zap size={22} color="#fff" />
+    <header className="glass-panel mobile-compact-header" style={{ padding: '0.8rem 1.5rem', margin: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+        <div style={{ background: 'var(--accent-gradient)', padding: '0.45rem', borderRadius: '10px', display: 'flex', flexShrink: 0 }}>
+          <Zap size={20} color="#fff" />
         </div>
-        <div>
-          <h1 style={{ fontSize: '1.2rem', fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: '1.05rem', fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             APEX PRODUCTIVITY
           </h1>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Goals → Today's Actions</span>
+          <span className="hide-on-mobile" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Goals → Today's Actions</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div className="streak-badge" title="Daily Completion Streak">
-          <Flame size={16} color="#fff" />
-          <span>7 Day Streak</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+        <div className="streak-badge" title="Daily Completion Streak" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
+          <Flame size={14} color="#fff" />
+          <span>{streak}<span className="hide-on-mobile"> Day Streak</span></span>
         </div>
 
-        <button onClick={onOpenQuickCapture} className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-          <Plus size={16} />
-          <span>Quick Task</span>
+        <button onClick={onOpenQuickCapture} className="btn-primary" style={{ padding: '0.45rem 0.8rem', fontSize: '0.8rem' }} title="Quick Task">
+          <Plus size={15} />
+          <span className="hide-on-mobile">Quick Task</span>
         </button>
 
-        <button onClick={onToggleTheme} className="btn-secondary" style={{ padding: '0.5rem', borderRadius: '50%' }}>
-          {isDarkMode ? <Sun size={18} color="#f59e0b" /> : <Moon size={18} color="#3b82f6" />}
+        <button onClick={onToggleTheme} className="btn-secondary" style={{ padding: '0.45rem', borderRadius: '50%' }} title="Toggle Theme" aria-label="Toggle Theme">
+          {isDarkMode ? <Sun size={16} color="#f59e0b" /> : <Moon size={16} color="#3b82f6" />}
         </button>
 
-        <button onClick={onOpenAuthModal} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-          <User size={16} />
-          <span>{user.id === 'guest-local-user' ? 'Guest Mode' : user.full_name || 'Account'}</span>
+        <button
+          onClick={onOpenAuthModal}
+          className="btn-secondary"
+          style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+          title={
+            syncStatus === 'synced'
+              ? 'Account & Cloud: Synced'
+              : syncStatus === 'syncing'
+              ? 'Account & Cloud: Syncing...'
+              : syncStatus === 'offline'
+              ? 'Account & Cloud: Offline'
+              : syncStatus === 'error'
+              ? 'Account & Cloud: Sync issue'
+              : 'Account & Local Storage'
+          }
+        >
+          {syncStatus === 'synced' ? (
+            <Cloud size={14} color="var(--accent-success)" />
+          ) : syncStatus === 'syncing' ? (
+            <RefreshCw size={14} color="var(--accent-primary)" style={{ animation: 'spin 1.2s linear infinite' }} />
+          ) : syncStatus === 'offline' ? (
+            <CloudOff size={14} color="var(--accent-warning)" />
+          ) : syncStatus === 'error' ? (
+            <CloudOff size={14} color="var(--accent-danger)" />
+          ) : (
+            <User size={15} />
+          )}
+          <span className="hide-on-mobile">{user.id === 'guest-local-user' ? 'Guest' : user.full_name || 'Account'}</span>
         </button>
       </div>
     </header>

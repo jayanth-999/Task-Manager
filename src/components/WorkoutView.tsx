@@ -9,6 +9,15 @@ export const WorkoutView: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+      {/* Read-Only Banner */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.6rem',
+        padding: '0.7rem 1rem', borderRadius: 'var(--radius-sm)',
+        background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)',
+        fontSize: '0.82rem', color: 'var(--accent-warning)',
+      }}>
+        📖 <strong>Reference Guide</strong> — Changes here are temporary and won't be saved across page refreshes.
+      </div>
       {/* Header & Mode Switcher */}
       <div className="glass-panel" style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.8rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
