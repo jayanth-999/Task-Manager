@@ -3,7 +3,7 @@
 export type Priority = 'critical' | 'high' | 'medium' | 'low';
 export type TaskStatus = 'todo' | 'in_progress' | 'blocked' | 'completed' | 'archived' | 'trash';
 export type RoadmapStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archived';
-export type HabitFrequency = 'daily' | 'weekly_days' | 'interval';
+export type HabitFrequency = 'daily' | 'weekly' | 'weekly_days' | 'interval';
 export type WorkoutMode = 'home' | 'gym';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
@@ -149,6 +149,7 @@ export interface Habit {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+  archived_at?: string;
   logs?: HabitLog[];
 }
 
@@ -259,6 +260,7 @@ export interface FocusSession {
   duration_minutes: number;
   started_at: string;
   completed_at?: string;
+  notes?: string;
 }
 
 export interface NotificationItem {

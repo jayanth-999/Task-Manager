@@ -215,6 +215,10 @@ export class SyncEngine {
     return db.getAll('sync_queue');
   }
 
+  static async retrySync(): Promise<void> {
+    return this.processSyncQueue();
+  }
+
   static async processSyncQueue(): Promise<void> {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       updateSyncStatus('offline');

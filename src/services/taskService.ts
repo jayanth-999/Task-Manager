@@ -52,46 +52,235 @@ export function isDateMatchingRecurrence(
   return true;
 }
 
+function parseMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+function formatMinutes(totalMins: number): string {
+  const normalized = ((totalMins % 1440) + 1440) % 1440;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export function getCustomizedDailyRoutine(
   workStart: string = '14:00',
   workEnd: string = '23:00'
 ): Array<Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'version'>> {
   const startLabel = formatTimeLabel(workStart);
   const endLabel = formatTimeLabel(workEnd);
+  const startMins = parseMinutes(workStart);
+  const endMins = parseMinutes(workEnd);
+
+  // If afternoon/evening shift (>= 12:00 PM), keep the classic morning prep routine
+  const isAfternoonShift = startMins >= 12 * 60;
+
+  if (isAfternoonShift) {
+    return [
+      {
+        title: '🌅 Wake Up, Hydration & Pre-Workout Energizing Snack',
+        description: '1 Banana + 5 Almonds or warm lemon honey water for morning energy.',
+        status: 'todo',
+        priority: 'medium',
+        due_time: '07:00',
+        scheduled_start: '07:00',
+        scheduled_end: '07:30',
+        category: 'routine',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '🏋️‍♂️ Morning Workout (Home Bodyweight / Gym Routine)',
+        description: 'Home: Push-ups, Squats, Plank & Core | Gym: Bench, Cable Pulldown, Shoulder Press.',
+        status: 'todo',
+        priority: 'high',
+        due_time: '07:30',
+        scheduled_start: '07:30',
+        scheduled_end: '08:30',
+        category: 'fitness',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '🍳 Post-Workout High-Protein Breakfast & Recovery',
+        description: '3 Boiled eggs or 100g sautéed paneer/tofu with sprouts or oats for muscle recovery.',
+        status: 'todo',
+        priority: 'high',
+        due_time: '08:30',
+        scheduled_start: '08:30',
+        scheduled_end: '09:00',
+        category: 'routine',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '📈 Morning Investment & Market Trends Study (10–15 Mins)',
+        description: 'Review top market news headlines, macro indicators, ETF/SIP tracking, and tech trends.',
+        status: 'todo',
+        priority: 'medium',
+        due_time: '09:00',
+        scheduled_start: '09:00',
+        scheduled_end: '09:15',
+        category: 'learning',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '🥗 Cooking & Meal Preparation (Lunch & Pre-Work Food)',
+        description: 'Cook nutritious lunch & pre-work meal (e.g., Quick One-Pot Pasta or Paneer Stir-Fry).',
+        status: 'todo',
+        priority: 'high',
+        due_time: '10:00',
+        scheduled_start: '10:00',
+        scheduled_end: '12:30',
+        category: 'cooking',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '🎮 Leisure, Rest & Personal Recharge Time',
+        description: 'Relaxation, gaming, reading, or hobby time before getting ready for work.',
+        status: 'todo',
+        priority: 'low',
+        due_time: '12:30',
+        scheduled_start: '12:30',
+        scheduled_end: '13:30',
+        category: 'leisure',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: `🏢 Work Shift (${startLabel} – ${endLabel})`,
+        description: 'Primary engineering work tasks, sprint deliverables, and team collaboration.',
+        status: 'todo',
+        priority: 'critical',
+        due_time: workStart,
+        scheduled_start: workStart,
+        scheduled_end: workEnd,
+        category: 'work',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+      },
+      {
+        title: '🤖 1-Hour Tech Learning: AI Agents, RAG & MCP (30 Mins)',
+        description: 'Dedicated 30 mins: AI Agents, RAG chunking & embeddings, System Design & MCPs.',
+        status: 'todo',
+        priority: 'critical',
+        due_time: '17:00',
+        scheduled_start: '17:00',
+        scheduled_end: '17:30',
+        category: 'learning',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '⚙️ 1-Hour Tech Learning: DevOps & Pure Python - No Copilot (30 Mins)',
+        description: 'Dedicated 30 mins: K8s/Docker/Linux/Terraform + native Python coding practice without Copilot.',
+        status: 'todo',
+        priority: 'critical',
+        due_time: '17:30',
+        scheduled_start: '17:30',
+        scheduled_end: '18:00',
+        category: 'learning',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '🛒 Commute & Day-Before Grocery Check for Tomorrow',
+        description: 'Return home and verify ingredients for tomorrow’s planned recipes.',
+        status: 'todo',
+        priority: 'medium',
+        due_time: workEnd,
+        scheduled_start: workEnd,
+        scheduled_end: formatMinutes(endMins + 30),
+        category: 'errands',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '🛋️ Evening Wind-Down & Relax',
+        description: 'Decompress after work shift, light reading, prepare for rest.',
+        status: 'todo',
+        priority: 'low',
+        due_time: formatMinutes(endMins + 30),
+        scheduled_start: formatMinutes(endMins + 30),
+        scheduled_end: formatMinutes(endMins + 60),
+        category: 'leisure',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+      {
+        title: '😴 Sleeping Hours (7 Hours Rest)',
+        description: 'Deep restorative sleep from night to morning.',
+        status: 'todo',
+        priority: 'high',
+        due_time: formatMinutes(endMins + 60),
+        scheduled_start: formatMinutes(endMins + 60),
+        scheduled_end: '07:00',
+        category: 'routine',
+        is_recurring: true,
+        recurrence_rule: 'FREQ=DAILY',
+      },
+    ];
+  }
+
+  // Morning / Day shift (< 12:00 PM, e.g. 09:00 - 17:00 or 18:00)
+  const wakeStart = formatMinutes(startMins - 120);
+  const wakeEnd = formatMinutes(startMins - 90);
+  const workoutStart = formatMinutes(startMins - 90);
+  const workoutEnd = formatMinutes(startMins - 30);
+  const breakfastStart = formatMinutes(startMins - 30);
+  const breakfastEnd = workStart;
+
+  const commuteStart = workEnd;
+  const commuteEnd = formatMinutes(endMins + 30);
+  const learn1Start = formatMinutes(endMins + 30);
+  const learn1End = formatMinutes(endMins + 60);
+  const learn2Start = formatMinutes(endMins + 60);
+  const learn2End = formatMinutes(endMins + 90);
+  const dinnerStart = formatMinutes(endMins + 90);
+  const dinnerEnd = formatMinutes(endMins + 150);
+  const investStart = formatMinutes(endMins + 150);
+  const investEnd = formatMinutes(endMins + 180);
+  const windDownStart = formatMinutes(endMins + 180);
+  const windDownEnd = formatMinutes(endMins + 240);
+  const sleepStart = formatMinutes(endMins + 240);
+  const sleepEnd = wakeStart;
 
   return [
     {
-      title: '🌅 Wake Up, Hydration & Pre-Workout Energizing Snack',
-      description: '1 Banana + 5 Almonds or warm lemon honey water for morning energy.',
+      title: '🌅 Wake Up, Hydration & Morning Prep',
+      description: 'Warm lemon water, hydration & light stretching before workout.',
       status: 'todo',
       priority: 'medium',
-      due_time: '07:00',
-      scheduled_start: '07:00',
-      scheduled_end: '07:30',
+      due_time: wakeStart,
+      scheduled_start: wakeStart,
+      scheduled_end: wakeEnd,
       category: 'routine',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
     },
     {
       title: '🏋️‍♂️ Morning Workout (Home Bodyweight / Gym Routine)',
-      description: 'Home: Push-ups, Squats, Plank & Core | Gym: Bench, Cable Pulldown, Shoulder Press.',
+      description: 'Home: Push-ups, Squats, Plank & Core | Gym: Strength & Cardio.',
       status: 'todo',
       priority: 'high',
-      due_time: '07:30',
-      scheduled_start: '07:30',
-      scheduled_end: '08:30',
+      due_time: workoutStart,
+      scheduled_start: workoutStart,
+      scheduled_end: workoutEnd,
       category: 'fitness',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
     },
     {
       title: '🍳 Post-Workout High-Protein Breakfast & Recovery',
-      description: '3 Boiled eggs or 100g sautéed paneer/tofu with sprouts or oats for muscle recovery.',
+      description: 'Nutritious high-protein breakfast and hydration before work shift.',
       status: 'todo',
       priority: 'high',
-      due_time: '08:30',
-      scheduled_start: '08:30',
-      scheduled_end: '09:00',
+      due_time: breakfastStart,
+      scheduled_start: breakfastStart,
+      scheduled_end: breakfastEnd,
       category: 'routine',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
@@ -101,9 +290,9 @@ export function getCustomizedDailyRoutine(
       description: 'Review top market news headlines, macro indicators, ETF/SIP tracking, and tech trends.',
       status: 'todo',
       priority: 'medium',
-      due_time: '09:00',
-      scheduled_start: '09:00',
-      scheduled_end: '09:15',
+      due_time: formatMinutes(startMins - 300),
+      scheduled_start: formatMinutes(startMins - 300),
+      scheduled_end: formatMinutes(startMins - 285),
       category: 'learning',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
@@ -113,9 +302,9 @@ export function getCustomizedDailyRoutine(
       description: 'Cook nutritious lunch & pre-work meal (e.g., Quick One-Pot Pasta or Paneer Stir-Fry).',
       status: 'todo',
       priority: 'high',
-      due_time: '10:00',
-      scheduled_start: '10:00',
-      scheduled_end: '12:30',
+      due_time: formatMinutes(startMins - 240),
+      scheduled_start: formatMinutes(startMins - 240),
+      scheduled_end: formatMinutes(startMins - 90),
       category: 'cooking',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
@@ -125,9 +314,9 @@ export function getCustomizedDailyRoutine(
       description: 'Relaxation, gaming, reading, or hobby time before getting ready for work.',
       status: 'todo',
       priority: 'low',
-      due_time: '12:30',
-      scheduled_start: '12:30',
-      scheduled_end: '13:30',
+      due_time: formatMinutes(startMins - 90),
+      scheduled_start: formatMinutes(startMins - 90),
+      scheduled_end: formatMinutes(startMins - 30),
       category: 'leisure',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
@@ -145,13 +334,25 @@ export function getCustomizedDailyRoutine(
       recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
     },
     {
+      title: '🛒 Commute & Grocery Run for Tomorrow',
+      description: 'Return commute and verify ingredients for tomorrow’s meals.',
+      status: 'todo',
+      priority: 'medium',
+      due_time: commuteStart,
+      scheduled_start: commuteStart,
+      scheduled_end: commuteEnd,
+      category: 'errands',
+      is_recurring: true,
+      recurrence_rule: 'FREQ=DAILY',
+    },
+    {
       title: '🤖 1-Hour Tech Learning: AI Agents, RAG & MCP (30 Mins)',
       description: 'Dedicated 30 mins: AI Agents, RAG chunking & embeddings, System Design & MCPs.',
       status: 'todo',
       priority: 'critical',
-      due_time: '17:00',
-      scheduled_start: '17:00',
-      scheduled_end: '17:30',
+      due_time: learn1Start,
+      scheduled_start: learn1Start,
+      scheduled_end: learn1End,
       category: 'learning',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
@@ -161,45 +362,57 @@ export function getCustomizedDailyRoutine(
       description: 'Dedicated 30 mins: K8s/Docker/Linux/Terraform + native Python coding practice without Copilot.',
       status: 'todo',
       priority: 'critical',
-      due_time: '17:30',
-      scheduled_start: '17:30',
-      scheduled_end: '18:00',
+      due_time: learn2Start,
+      scheduled_start: learn2Start,
+      scheduled_end: learn2End,
       category: 'learning',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
     },
     {
-      title: '🛒 Commute & Day-Before Grocery Check for Tomorrow',
-      description: 'Return home and verify ingredients for tomorrow’s planned recipes.',
+      title: '🥗 Cooking & Dinner (Nutritious Evening Meal)',
+      description: 'Cook balanced dinner & meal prep.',
       status: 'todo',
-      priority: 'medium',
-      due_time: workEnd,
-      scheduled_start: workEnd,
-      scheduled_end: '23:30',
-      category: 'errands',
+      priority: 'high',
+      due_time: dinnerStart,
+      scheduled_start: dinnerStart,
+      scheduled_end: dinnerEnd,
+      category: 'cooking',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
     },
     {
-      title: '🛋️ Evening Wind-Down & Relax',
-      description: 'Decompress after work shift, light reading, prepare for rest.',
+      title: '📈 Evening Investment & Market Trends Review (15 Mins)',
+      description: 'Review market wrap, macro indicators, ETF tracking & portfolio allocations.',
+      status: 'todo',
+      priority: 'medium',
+      due_time: investStart,
+      scheduled_start: investStart,
+      scheduled_end: investEnd,
+      category: 'learning',
+      is_recurring: true,
+      recurrence_rule: 'FREQ=DAILY',
+    },
+    {
+      title: '🛋️ Leisure & Evening Wind-Down',
+      description: 'Personal hobby time, reading, meditation, prepare for rest.',
       status: 'todo',
       priority: 'low',
-      due_time: '23:30',
-      scheduled_start: '23:30',
-      scheduled_end: '00:00',
+      due_time: windDownStart,
+      scheduled_start: windDownStart,
+      scheduled_end: windDownEnd,
       category: 'leisure',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
     },
     {
-      title: '😴 Sleeping Hours (7 Hours Rest)',
-      description: 'Deep restorative sleep from midnight to 7:00 AM.',
+      title: '😴 Sleeping Hours (7–8 Hours Rest)',
+      description: 'Deep restorative sleep to wake up refreshed for tomorrow.',
       status: 'todo',
       priority: 'high',
-      due_time: '00:00',
-      scheduled_start: '00:00',
-      scheduled_end: '07:00',
+      due_time: sleepStart,
+      scheduled_start: sleepStart,
+      scheduled_end: sleepEnd,
       category: 'routine',
       is_recurring: true,
       recurrence_rule: 'FREQ=DAILY',
@@ -418,6 +631,45 @@ export class TaskService {
       created_at: now,
       updated_at: now,
     }));
+    for (const task of starterTasks) await SyncEngine.saveLocalItem('tasks', task, 'INSERT');
+    if (isCloudConfigured && userId !== 'guest-local-user') {
+      try {
+        const result = await supabase.from('tasks').insert(starterTasks);
+        throwIfSupabaseError(result);
+      } catch (err) {
+        console.warn('Queued starter routine for sync:', err);
+      }
+    }
+    return this.getTasks(userId, targetDate);
+  }
+
+  /** Re-populates today's routine tasks according to the latest user preferences. */
+  static async resetDailyRoutine(userId: string, targetDate: string): Promise<Task[]> {
+    const existing = await this.getTasks(userId, targetDate);
+    const routineCategories = new Set(['routine', 'work', 'learning', 'fitness', 'cooking', 'leisure']);
+    for (const t of existing) {
+      if (t.is_recurring || t.parent_task_id || (t.category && routineCategories.has(t.category))) {
+        await this.deleteTask(userId, t.id);
+      }
+    }
+
+    const activeMilestone = await RoadmapService.getActiveMilestone(userId);
+    const prefs = getPreferences();
+    const routineTemplates = getCustomizedDailyRoutine(prefs.workStart || '14:00', prefs.workEnd || '23:00');
+    const now = new Date().toISOString();
+    const starterTasks = routineTemplates.map((item, index): Task => ({
+      ...item,
+      id: crypto.randomUUID(),
+      user_id: userId,
+      title: item.category === 'learning' && activeMilestone && index === 5 ? `🎯 ${activeMilestone.milestone.title}` : item.title,
+      milestone_id: item.category === 'learning' && activeMilestone && index === 5 ? activeMilestone.milestone.id : undefined,
+      due_date: targetDate,
+      subtasks: [],
+      version: 1,
+      created_at: now,
+      updated_at: now,
+    }));
+
     for (const task of starterTasks) await SyncEngine.saveLocalItem('tasks', task, 'INSERT');
     if (isCloudConfigured && userId !== 'guest-local-user') {
       try {
@@ -687,30 +939,6 @@ export class TaskService {
     const newStatus: TaskStatus = currentStatus === 'completed' ? 'todo' : 'completed';
     const updated = await this.setTaskStatus(userId, taskId, newStatus);
     return updated ? updated.status : newStatus;
-  }
-
-  // Reset daily routine tasks without duplicate pollution
-  static async resetDailyRoutine(userId: string, targetDate: string): Promise<Task[]> {
-    const localTasks = await SyncEngine.getLocalItems<Task>('tasks', userId);
-
-    // Remove existing tasks for this date from local store
-    for (const t of localTasks) {
-      if (t.due_date === targetDate) {
-        await SyncEngine.deleteLocalItem('tasks', t.id);
-      }
-    }
-
-    if (isCloudConfigured && userId !== 'guest-local-user') {
-      try {
-        const result = await supabase.from('tasks').delete().eq('user_id', userId).eq('due_date', targetDate);
-        throwIfSupabaseError(result);
-      } catch (err) {
-        console.warn('Queued cloud delete for routine reset:', err);
-      }
-    }
-
-    // Now re-fetch which will cleanly initialize the default routine
-    return this.getTasks(userId, targetDate);
   }
 
   // Auto-rollover uncompleted tasks strictly from past dates (due_date < todayDate) into todayDate ("Move Right")

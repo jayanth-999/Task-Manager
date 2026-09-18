@@ -5,7 +5,7 @@ import { HabitService } from './habitService';
 import { RoadmapService } from './roadmapService';
 import { SyncEngine } from './syncEngine';
 import { calculateElapsedFocusMinutes } from './focusService';
-import { calculateActiveStreak } from './dateUtils';
+import { calculateActiveStreak, dateKey, addLocalDays } from './dateUtils';
 import { throwIfSupabaseError } from './supabaseResult';
 import type { Task, Habit } from '../types';
 
@@ -15,7 +15,7 @@ const now = '2026-09-17T10:00:00.000Z';
 function task(id: string, user_id = guestId): Task {
   return {
     id, user_id, title: 'Regression task', status: 'todo', priority: 'medium',
-    due_date: '2026-09-17', category: 'general', version: 1,
+    due_date: dateKey(), category: 'general', version: 1,
     created_at: now, updated_at: now,
   };
 }
@@ -24,6 +24,24 @@ beforeAll(() => {
   // Node's Web Crypto is available in supported test environments; this keeps
   // older runners compatible with the services' UUID generation.
   if (!globalThis.crypto) Object.defineProperty(globalThis, 'crypto', { value: { randomUUID: () => 'test-uuid' } });
+  let counter = 0;
+  const generateId = () =>
+    `00000000-0000-0000-0000-${String(++counter).padStart(12, '0')}` as `${string}-${string}-${string}-${string}-${string}`;
+  if (!globalThis.crypto) {
+    Object.defineProperty(globalThis, 'crypto', {
+      value: { randomUUID: generateId },
+      configurable: true,
+    });
+  } else {
+    try {
+      const probe = globalThis.crypto.randomUUID();
+      if (!probe || (probe as string) === 'test-uuid') {
+        (globalThis.crypto as { randomUUID: () => `${string}-${string}-${string}-${string}-${string}` }).randomUUID = generateId;
+      }
+    } catch {
+      (globalThis.crypto as { randomUUID: () => `${string}-${string}-${string}-${string}-${string}` }).randomUUID = generateId;
+    }
+  }
 });
 
 describe('task deletion and restore', () => {
@@ -68,8 +86,8 @@ describe('guest migration', () => {
 
 describe('rollover safety and recurring routines', () => {
   it('does not roll today’s tasks forward when viewing a future date', async () => {
-    const today = '2026-09-17';
-    const tomorrow = '2026-09-18';
+    const today = dateKey();
+    const tomorrow = addLocalDays(today, 1);
     const testTask = task(`rollover-safety-${Date.now()}`);
     testTask.due_date = today;
     testTask.status = 'todo';
@@ -86,8 +104,8 @@ describe('rollover safety and recurring routines', () => {
   });
 
   it('automatically displays recurring routine tasks on next days', async () => {
-    const today = '2026-09-17';
-    const tomorrow = '2026-09-18';
+    const today = dateKey();
+    const tomorrow = addLocalDays(today, 1);
     const routineTask: Task = {
       id: `routine-test-${Date.now()}`,
       user_id: guestId,
@@ -460,6 +478,116 @@ describe('errands persistence', () => {
     expect(stored?.category).toBe('errands');
   });
 });
+
+describe('weekly recurrence and skip persistence in taskService', () => {
+  it('instantiates weekly recurring tasks strictly on matching day-of-week intervals', async () => {
+    const userId = `weekly-recur-user-${Date.now()}`;
+    const baseDate = dateKey();
+    const nextWeekDate = addLocalDays(baseDate, 7);
+    const tomorrowDate = addLocalDays(baseDate, 1);
+    const threeDaysDate = addLocalDays(baseDate, 3);
+
+    const weeklyTemplate: Task = {
+      id: `weekly-tmpl-${Date.now()}`,
+      user_id: userId,
+      title: 'Weekly Sprint Retrospective & Demo',
+      status: 'todo',
+      priority: 'high',
+      due_date: baseDate,
+      category: 'work',
+      is_recurring: true,
+      recurrence_rule: 'FREQ=WEEKLY',
+      version: 1,
+      created_at: now,
+      updated_at: now,
+    };
+    await SyncEngine.saveLocalItem('tasks', weeklyTemplate);
+
+    // 1. Check next week (+7 days): must instantiate
+    const nextWeekTasks = await TaskService.getTasks(userId, nextWeekDate);
+    expect(nextWeekTasks.some(t => t.parent_task_id === weeklyTemplate.id && t.due_date === nextWeekDate)).toBe(true);
+
+    // 2. Check tomorrow (+1 day): must NOT instantiate
+    const tomorrowTasks = await TaskService.getTasks(userId, tomorrowDate);
+    expect(tomorrowTasks.some(t => t.parent_task_id === weeklyTemplate.id)).toBe(false);
+
+    // 3. Check +3 days: must NOT instantiate
+    const threeDaysTasks = await TaskService.getTasks(userId, threeDaysDate);
+    expect(threeDaysTasks.some(t => t.parent_task_id === weeklyTemplate.id)).toBe(false);
+  });
+
+  it('preserves skip exceptions across multiple queries and does not resurrect skipped instances', async () => {
+    const userId = `skip-persist-user-${Date.now()}`;
+    const baseDate = dateKey();
+    const day1 = addLocalDays(baseDate, 1);
+    const day2 = addLocalDays(baseDate, 2);
+
+    const dailyTemplate: Task = {
+      id: `daily-persist-${Date.now()}`,
+      user_id: userId,
+      title: 'Daily Core Exercises',
+      status: 'todo',
+      priority: 'medium',
+      due_date: baseDate,
+      category: 'fitness',
+      is_recurring: true,
+      recurrence_rule: 'FREQ=DAILY',
+      recurrence_exceptions: [],
+      version: 1,
+      created_at: now,
+      updated_at: now,
+    };
+    await SyncEngine.saveLocalItem('tasks', dailyTemplate);
+
+    // 1. Fetch day 1 tasks — occurrence is instantiated
+    const day1Tasks = await TaskService.getTasks(userId, day1);
+    const occDay1 = day1Tasks.find(t => t.parent_task_id === dailyTemplate.id);
+    expect(occDay1).toBeDefined();
+
+    // 2. Skip this occurrence on day 1
+    const skipped = await TaskService.skipOccurrence(userId, occDay1!.id);
+    expect(skipped).toBe(true);
+
+    // 3. Re-query day 1 — should NOT resurrect because day 1 is in parent recurrence_exceptions
+    const day1TasksAfterSkip = await TaskService.getTasks(userId, day1);
+    expect(day1TasksAfterSkip.some(t => t.parent_task_id === dailyTemplate.id && t.due_date === day1)).toBe(false);
+
+    // 4. Query day 2 — day 2 should still instantiate normally
+    const day2Tasks = await TaskService.getTasks(userId, day2);
+    expect(day2Tasks.some(t => t.parent_task_id === dailyTemplate.id && t.due_date === day2)).toBe(true);
+  });
+
+  it('resets today routine cleanly with resetDailyRoutine', async () => {
+    const userId = `reset-routine-user-${Date.now()}`;
+    const today = dateKey();
+
+    // 1. First add starter routine
+    await TaskService.addStarterRoutine(userId, today);
+    const initialTasks = await TaskService.getTasks(userId, today);
+    expect(initialTasks.length).toBeGreaterThan(0);
+
+    // 2. Add an obsolete routine task
+    const customTask: Task = {
+      id: `old-routine-${Date.now()}`,
+      user_id: userId,
+      title: 'Obsolete Routine Task',
+      status: 'todo',
+      priority: 'low',
+      due_date: today,
+      category: 'routine',
+      version: 1,
+      created_at: now,
+      updated_at: now,
+    };
+    await SyncEngine.saveLocalItem('tasks', customTask);
+
+    // 3. Reset daily routine
+    const resetTasks = await TaskService.resetDailyRoutine(userId, today);
+    expect(resetTasks.some(t => t.id === customTask.id)).toBe(false);
+    expect(resetTasks.some(t => t.title.includes('Wake Up'))).toBe(true);
+  });
+});
+
 
 
 

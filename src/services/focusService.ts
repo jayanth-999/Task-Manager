@@ -31,7 +31,8 @@ export class FocusService {
     userId: string,
     durationMinutes: number,
     taskId?: string,
-    completedAt = new Date()
+    completedAt = new Date(),
+    notes?: string
   ): Promise<FocusSession> {
     const session: FocusSession = {
       id: crypto.randomUUID(),
@@ -40,6 +41,7 @@ export class FocusService {
       duration_minutes: durationMinutes,
       started_at: new Date(completedAt.getTime() - durationMinutes * 60 * 1000).toISOString(),
       completed_at: completedAt.toISOString(),
+      notes: notes?.trim() || undefined,
     };
 
     await SyncEngine.saveLocalItem('focus_sessions', session);

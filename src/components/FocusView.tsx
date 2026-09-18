@@ -8,14 +8,17 @@ import type { Task, FocusSession } from '../types';
 interface FocusViewProps {
   userId: string;
   tasks: Task[];
+  onToggleTask?: (taskId: string) => void;
 }
 
-export const FocusView: React.FC<FocusViewProps> = ({ userId, tasks }) => {
+export const FocusView: React.FC<FocusViewProps> = ({ userId, tasks, onToggleTask }) => {
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [duration, setDuration] = useState<number>(25 * 60); // 25 mins in seconds
   const [timeLeft, setTimeLeft] = useState<number>(25 * 60);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  const [sessionNotes, setSessionNotes] = useState<string>('');
+  const [completedPromptTask, setCompletedPromptTask] = useState<Task | null>(null);
   const [sessions, setSessions] = useState<FocusSession[]>([]);
   const timerRef = useRef<number | null>(null);
 
@@ -79,7 +82,16 @@ export const FocusView: React.FC<FocusViewProps> = ({ userId, tasks }) => {
     if (mode === 'focus') {
       const minutes = Math.max(1, Math.round(elapsedSeconds / 60));
       await FocusService.logFocusSession(userId, minutes, selectedTaskId || undefined);
+      await FocusService.logFocusSession(userId, minutes, selectedTaskId || undefined, new Date(), sessionNotes);
       await loadSessions();
+
+      if (selectedTaskId) {
+        const matched = tasks.find(t => t.id === selectedTaskId);
+        if (matched && matched.status !== 'completed') {
+          setCompletedPromptTask(matched);
+        }
+      }
+      setSessionNotes('');
       handleModeChange('break');
     } else {
       handleModeChange('focus');
@@ -184,6 +196,46 @@ export const FocusView: React.FC<FocusViewProps> = ({ userId, tasks }) => {
           </select>
         </div>
 
+        {/* Task Completion Prompt Banner */}
+        {completedPromptTask && (
+          <div
+            className="glass-card"
+            style={{
+              maxWidth: '400px',
+              width: '100%',
+              borderLeft: '4px solid var(--accent-success)',
+              background: 'rgba(16, 185, 129, 0.12)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.6rem',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              🎉 Focus Sprint Logged! Mark "{completedPromptTask.title}" as completed?
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem' }}>
+              <button
+                onClick={() => {
+                  if (onToggleTask) onToggleTask(completedPromptTask.id);
+                  setCompletedPromptTask(null);
+                }}
+                className="btn-primary"
+                style={{ padding: '0.35rem 0.8rem', fontSize: '0.78rem' }}
+              >
+                ✓ Mark Completed
+              </button>
+              <button
+                onClick={() => setCompletedPromptTask(null)}
+                className="btn-secondary"
+                style={{ padding: '0.35rem 0.8rem', fontSize: '0.78rem' }}
+              >
+                Keep Open
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Digital Countdown Timer */}
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
           <div
@@ -202,6 +254,31 @@ export const FocusView: React.FC<FocusViewProps> = ({ userId, tasks }) => {
         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
           {mode === 'focus' ? '🎯 High-Performance Focus Block' : '☕ Rest & Mind Reset'}
         </span>
+
+        {/* Session Notes Input */}
+        <div style={{ maxWidth: '400px', width: '100%', textAlign: 'left' }}>
+          <label style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>
+            Session Notes & Takeaways (Optional):
+          </label>
+          <textarea
+            placeholder="Key accomplishments or focus notes for this sprint..."
+            value={sessionNotes}
+            onChange={e => setSessionNotes(e.target.value)}
+            rows={2}
+            style={{
+              width: '100%',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-glass)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.55rem',
+              color: 'var(--text-primary)',
+              fontSize: '0.82rem',
+              outline: 'none',
+              resize: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
 
         {/* Timer Action Controls */}
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -280,6 +357,11 @@ export const FocusView: React.FC<FocusViewProps> = ({ userId, tasks }) => {
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         {dateDisplay} at {timeDisplay}
                       </div>
+                      {s.notes && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem', fontStyle: 'italic' }}>
+                          "{s.notes}"
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -1,24 +1,10 @@
 // oxlint-disable react/immutability, react-hooks/exhaustive-deps
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { RotateCcw, X } from 'lucide-react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { TodayEngine } from './components/TodayEngine';
-import { TaskViews } from './components/TaskViews';
-import { RoadmapsView } from './components/RoadmapsView';
-import { HabitsView } from './components/HabitsView';
-import { FocusView } from './components/FocusView';
-import { TechLearningView } from './components/TechLearningView';
-import { WorkoutView } from './components/WorkoutView';
-import { RecipesView } from './components/RecipesView';
-import { InvestmentView } from './components/InvestmentView';
-import { ErrandsView } from './components/ErrandsView';
-import { SettingsView } from './components/SettingsView';
-import { QuickCaptureModal } from './components/QuickCaptureModal';
-import { AuthModal } from './components/AuthModal';
-import { TaskModal } from './components/TaskModal';
-import { OnboardingModal } from './components/OnboardingModal';
 import { AuthService, GUEST_PROFILE } from './services/authService';
 import { TaskService } from './services/taskService';
 import { RoadmapService } from './services/roadmapService';
@@ -27,6 +13,22 @@ import { getLocalDateString, dateKey } from './services/dateUtils';
 import { isOnboardingComplete, savePreferences } from './services/userPreferences';
 import type { RoadmapImport } from './services/roadmapService';
 import type { Task, Roadmap, UserProfile, TaskStatus, RoadmapMilestone } from './types';
+
+// Code-split secondary views & dialogs to keep initial load lightweight (< 500 KB)
+const TaskViews = React.lazy(() => import('./components/TaskViews').then(m => ({ default: m.TaskViews })));
+const RoadmapsView = React.lazy(() => import('./components/RoadmapsView').then(m => ({ default: m.RoadmapsView })));
+const HabitsView = React.lazy(() => import('./components/HabitsView').then(m => ({ default: m.HabitsView })));
+const FocusView = React.lazy(() => import('./components/FocusView').then(m => ({ default: m.FocusView })));
+const TechLearningView = React.lazy(() => import('./components/TechLearningView').then(m => ({ default: m.TechLearningView })));
+const WorkoutView = React.lazy(() => import('./components/WorkoutView').then(m => ({ default: m.WorkoutView })));
+const RecipesView = React.lazy(() => import('./components/RecipesView').then(m => ({ default: m.RecipesView })));
+const InvestmentView = React.lazy(() => import('./components/InvestmentView').then(m => ({ default: m.InvestmentView })));
+const ErrandsView = React.lazy(() => import('./components/ErrandsView').then(m => ({ default: m.ErrandsView })));
+const SettingsView = React.lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+const QuickCaptureModal = React.lazy(() => import('./components/QuickCaptureModal').then(m => ({ default: m.QuickCaptureModal })));
+const AuthModal = React.lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
+const TaskModal = React.lazy(() => import('./components/TaskModal').then(m => ({ default: m.TaskModal })));
+const OnboardingModal = React.lazy(() => import('./components/OnboardingModal').then(m => ({ default: m.OnboardingModal })));
 
 const VALID_TABS = [
   'today', 'tasks', 'roadmaps', 'habits', 'focus',
@@ -233,7 +235,7 @@ export const App: React.FC = () => {
   };
 
   const handleResetRoutine = async () => {
-    const fresh = await TaskService.addStarterRoutine(currentUser.id, selectedDate);
+    const fresh = await TaskService.resetDailyRoutine(currentUser.id, selectedDate);
     setTasks(fresh);
   };
 
@@ -339,7 +341,9 @@ export const App: React.FC = () => {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Onboarding Modal — shown once for new users */}
       {showOnboarding && (
-        <OnboardingModal onComplete={handleOnboardingComplete} />
+        <Suspense fallback={null}>
+          <OnboardingModal onComplete={handleOnboardingComplete} />
+        </Suspense>
       )}
 
       {/* Top Header */}
@@ -347,6 +351,7 @@ export const App: React.FC = () => {
         user={currentUser}
         streak={streak}
         syncStatus={syncStatus}
+        onRetrySync={() => SyncEngine.retrySync()}
         onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         isDarkMode={isDarkMode}
@@ -378,69 +383,78 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'tasks' && (
-            <TaskViews
-              tasks={tasks}
-              userId={currentUser.id}
-              onToggleTask={handleToggleTask}
-              onSetTaskStatus={handleSetTaskStatus}
-              onDeleteTask={handleDeleteTask}
-              onEditTask={setEditingTask}
-              onSelectDate={(date) => {
-                setSelectedDate(date);
-                handleTabChange('today');
-              }}
-            />
-          )}
+          <Suspense fallback={<div className="glass-panel" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading view...</div>}>
+            {activeTab === 'tasks' && (
+              <TaskViews
+                tasks={tasks}
+                userId={currentUser.id}
+                onToggleTask={handleToggleTask}
+                onSetTaskStatus={handleSetTaskStatus}
+                onDeleteTask={handleDeleteTask}
+                onEditTask={setEditingTask}
+                onSelectDate={(date) => {
+                  setSelectedDate(date);
+                  handleTabChange('today');
+                }}
+              />
+            )}
 
-          {activeTab === 'roadmaps' && (
-            <RoadmapsView
-              roadmaps={roadmaps}
-              userId={currentUser.id}
-              onCreateFromTemplate={handleCreateRoadmapFromTemplate}
-              onImportRoadmap={handleImportRoadmap}
-              onDeleteRoadmap={handleDeleteRoadmap}
-              onMilestoneCompleted={async () => {
-                const refreshed = await RoadmapService.getRoadmaps(currentUser.id);
-                setRoadmaps(refreshed);
-              }}
-              onAddMilestoneToToday={handleAddMilestoneToToday}
-              onNavigateTab={handleTabChange}
-            />
-          )}
+            {activeTab === 'roadmaps' && (
+              <RoadmapsView
+                roadmaps={roadmaps}
+                userId={currentUser.id}
+                onCreateFromTemplate={handleCreateRoadmapFromTemplate}
+                onImportRoadmap={handleImportRoadmap}
+                onDeleteRoadmap={handleDeleteRoadmap}
+                onMilestoneCompleted={async () => {
+                  const refreshed = await RoadmapService.getRoadmaps(currentUser.id);
+                  setRoadmaps(refreshed);
+                }}
+                onAddMilestoneToToday={handleAddMilestoneToToday}
+                onNavigateTab={handleTabChange}
+              />
+            )}
 
-          {activeTab === 'habits' && (
-            <HabitsView userId={currentUser.id} />
-          )}
+            {activeTab === 'habits' && (
+              <HabitsView userId={currentUser.id} />
+            )}
 
-          {activeTab === 'focus' && (
-            <FocusView userId={currentUser.id} tasks={tasks} />
-          )}
+            {activeTab === 'focus' && (
+              <FocusView
+                userId={currentUser.id}
+                tasks={tasks}
+                onToggleTask={(taskId) => {
+                  const t = tasks.find(x => x.id === taskId);
+                  handleToggleTask(taskId, t?.status || 'todo');
+                }}
+              />
+            )}
 
-          {/* Reference Guides (Accessible via Sidebar) */}
-          {activeTab === 'learning' && <TechLearningView />}
-          {activeTab === 'fitness' && <WorkoutView />}
-          {activeTab === 'recipes' && <RecipesView />}
-          {activeTab === 'investment' && <InvestmentView />}
-          {activeTab === 'errands' && (
-            <ErrandsView
-              userId={currentUser.id}
-              onAddTaskToToday={(errand) => handleAddTask({
-                title: errand.title,
-                category: 'errands',
-                location: errand.location,
-                due_date: selectedDate,
-                priority: 'medium',
-              })}
-            />
-          )}
-          {activeTab === 'settings' && (
-            <SettingsView
-              currentUser={currentUser}
-              onUpdateUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
-              onOpenAuthModal={() => setIsAuthModalOpen(true)}
-            />
-          )}
+            {/* Reference Guides (Accessible via Sidebar) */}
+            {activeTab === 'learning' && <TechLearningView />}
+            {activeTab === 'fitness' && <WorkoutView />}
+            {activeTab === 'recipes' && <RecipesView userId={currentUser.id} />}
+            {activeTab === 'investment' && <InvestmentView />}
+            {activeTab === 'errands' && (
+              <ErrandsView
+                userId={currentUser.id}
+                onAddTaskToToday={(errand) => handleAddTask({
+                  title: errand.title,
+                  category: 'errands',
+                  location: errand.location,
+                  due_date: selectedDate,
+                  priority: 'medium',
+                })}
+              />
+            )}
+            {activeTab === 'settings' && (
+              <SettingsView
+                currentUser={currentUser}
+                onUpdateUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
+                onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              />
+            )}
+          </Suspense>
         </main>
       </div>
 
@@ -487,29 +501,41 @@ export const App: React.FC = () => {
       )}
 
       {/* Quick Capture Natural Language Modal */}
-      <QuickCaptureModal
-        isOpen={isQuickCaptureOpen}
-        onClose={() => setIsQuickCaptureOpen(false)}
-        onAddTask={parsed => handleAddTask(parsed)}
-      />
+      {isQuickCaptureOpen && (
+        <Suspense fallback={null}>
+          <QuickCaptureModal
+            isOpen={isQuickCaptureOpen}
+            onClose={() => setIsQuickCaptureOpen(false)}
+            onAddTask={parsed => handleAddTask(parsed)}
+          />
+        </Suspense>
+      )}
 
       {/* Auth & Guest Cloud Sync Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        currentUser={currentUser}
-        onAuthSuccess={loadUserAndData}
-      />
+      {isAuthModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            currentUser={currentUser}
+            onAuthSuccess={loadUserAndData}
+          />
+        </Suspense>
+      )}
 
       {/* Task Edit / Custom Time Modal */}
-      <TaskModal
-        isOpen={!!editingTask}
-        onClose={() => setEditingTask(null)}
-        task={editingTask}
-        onSave={handleUpdateTask}
-        onDelete={handleDeleteTask}
-        onSkipOccurrence={handleSkipOccurrence}
-      />
+      {editingTask && (
+        <Suspense fallback={null}>
+          <TaskModal
+            isOpen={!!editingTask}
+            onClose={() => setEditingTask(null)}
+            task={editingTask}
+            onSave={handleUpdateTask}
+            onDelete={handleDeleteTask}
+            onSkipOccurrence={handleSkipOccurrence}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

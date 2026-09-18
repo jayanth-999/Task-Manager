@@ -7,6 +7,7 @@ interface HeaderProps {
   user: UserProfile;
   streak?: number;
   syncStatus?: SyncStatus;
+  onRetrySync?: () => void;
   onOpenQuickCapture: () => void;
   onOpenAuthModal: () => void;
   isDarkMode: boolean;
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   user,
   streak = 0,
   syncStatus,
+  onRetrySync,
   onOpenQuickCapture,
   onOpenAuthModal,
   isDarkMode,
@@ -50,6 +52,42 @@ export const Header: React.FC<HeaderProps> = ({
         <button onClick={onToggleTheme} className="btn-secondary" style={{ padding: '0.45rem', borderRadius: '50%' }} title="Toggle Theme" aria-label="Toggle Theme">
           {isDarkMode ? <Sun size={16} color="#f59e0b" /> : <Moon size={16} color="#3b82f6" />}
         </button>
+
+        {syncStatus === 'error' && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '0.3rem 0.6rem',
+              fontSize: '0.75rem',
+              color: '#f87171',
+            }}
+          >
+            <span className="hide-on-mobile">Sync failed (Saved locally)</span>
+            <span className="hide-on-desktop">Sync issue</span>
+            {onRetrySync && (
+              <button
+                onClick={onRetrySync}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.35)',
+                  border: 'none',
+                  color: '#fff',
+                  borderRadius: '4px',
+                  padding: '0.15rem 0.45rem',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         <button
           onClick={onOpenAuthModal}

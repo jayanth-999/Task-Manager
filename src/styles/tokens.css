@@ -20,6 +20,18 @@
   --accent-gradient-fire: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
   --accent-gradient-success: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
 
+  /* Semantic Area Colors (Restrained Palette) */
+  --area-today: #3b82f6;      /* Blue */
+  --area-tasks: #64748b;      /* Slate */
+  --area-roadmaps: #8b5cf6;   /* Violet */
+  --area-habits: #14b8a6;     /* Teal */
+  --area-focus: #f97316;      /* Orange */
+  --area-learning: #06b6d4;   /* Cyan */
+  --area-fitness: #10b981;    /* Emerald */
+  --area-recipes: #f43f5e;    /* Coral */
+  --area-errands: #eab308;    /* Yellow */
+  --area-settings: #94a3b8;   /* Neutral */
+
   --border-glass: rgba(255, 255, 255, 0.1);
   --border-focus: rgba(59, 130, 246, 0.5);
 

@@ -49,7 +49,7 @@ function normalizeHabitKey(name: string): string {
 }
 
 export class HabitService {
-  static async getHabits(userId: string): Promise<Habit[]> {
+  static async getHabits(userId: string, includeArchived: boolean = false): Promise<Habit[]> {
     let rawHabits: Habit[] = [];
 
     if (!isCloudConfigured || userId === 'guest-local-user') {
@@ -159,7 +159,7 @@ export class HabitService {
     const logs = await this.getHabitLogs(userId);
     const uniqueHabits = Array.from(seen.values());
 
-    return uniqueHabits.map(h => {
+    const mapped = uniqueHabits.map(h => {
       const habitLogs = logs.filter(l => l.habit_id === h.id);
       const dateMap = new Map<string, HabitLog>();
       for (const l of habitLogs) {
@@ -177,6 +177,42 @@ export class HabitService {
         logs: dedupedLogs,
       };
     });
+
+    return includeArchived ? mapped : mapped.filter(h => !h.archived_at);
+  }
+
+  static async archiveHabit(userId: string, habitId: string): Promise<void> {
+    const habit = await SyncEngine.getLocalItem<Habit>('habits', habitId);
+    if (habit && habit.user_id === userId) {
+      habit.archived_at = new Date().toISOString();
+      habit.updated_at = new Date().toISOString();
+      await SyncEngine.saveLocalItem('habits', habit, 'UPDATE');
+      if (isCloudConfigured && userId !== 'guest-local-user') {
+        try {
+          const res = await supabase.from('habits').update({ archived_at: habit.archived_at, updated_at: habit.updated_at }).eq('id', habitId).eq('user_id', userId);
+          throwIfSupabaseError(res);
+        } catch (e) {
+          console.warn('Queued archive habit for sync:', e);
+        }
+      }
+    }
+  }
+
+  static async unarchiveHabit(userId: string, habitId: string): Promise<void> {
+    const habit = await SyncEngine.getLocalItem<Habit>('habits', habitId);
+    if (habit && habit.user_id === userId) {
+      delete habit.archived_at;
+      habit.updated_at = new Date().toISOString();
+      await SyncEngine.saveLocalItem('habits', habit, 'UPDATE');
+      if (isCloudConfigured && userId !== 'guest-local-user') {
+        try {
+          const res = await supabase.from('habits').update({ archived_at: null, updated_at: habit.updated_at }).eq('id', habitId).eq('user_id', userId);
+          throwIfSupabaseError(res);
+        } catch (e) {
+          console.warn('Queued unarchive habit for sync:', e);
+        }
+      }
+    }
   }
 
   static async getHabitLogs(userId: string): Promise<HabitLog[]> {
@@ -187,14 +223,17 @@ export class HabitService {
     return error ? SyncEngine.getLocalItems<HabitLog>('habit_logs', userId) : (data ?? []);
   }
 
-  static async createHabit(userId: string, name: string, frequency: any = 'daily'): Promise<Habit> {
+  static async createHabit(userId: string, name: string, frequency: 'daily' | 'weekly' = 'daily', targetCount: number = 1): Promise<Habit> {
     const trimmed = name.trim();
     if (!trimmed) throw new Error('Habit name cannot be empty');
 
-    const existingHabits = await this.getHabits(userId);
+    const existingHabits = await this.getHabits(userId, true);
     const key = normalizeHabitKey(trimmed);
     const existing = existingHabits.find(h => normalizeHabitKey(h.name) === key);
     if (existing) {
+      if (existing.archived_at) {
+        await this.unarchiveHabit(userId, existing.id);
+      }
       return existing;
     }
 
@@ -203,7 +242,7 @@ export class HabitService {
       user_id: userId,
       name: trimmed,
       frequency,
-      target_count_per_period: 1,
+      target_count_per_period: targetCount,
       current_streak: 0,
       longest_streak: 0,
       created_at: new Date().toISOString(),
