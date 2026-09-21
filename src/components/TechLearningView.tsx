@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, Code, Terminal, CheckCircle2 } from 'lucide-react';
 import { getLocalDateString } from '../services/dateUtils';
+import { createId } from '../services/idUtils';
 
 export const TechLearningView: React.FC = () => {
   const [learningLog, setLearningLog] = useState<Array<{ id: string; date: string; aiTopic: string; devopsTopic: string; duration: number; isCompleted: boolean }>>(() => {
@@ -20,7 +21,7 @@ export const TechLearningView: React.FC = () => {
     e.preventDefault();
     if (!aiInput.trim() && !devopsInput.trim()) return;
     const newEntry = {
-      id: crypto.randomUUID(),
+      id: createId(),
       date: getLocalDateString(),
       aiTopic: aiInput || 'AI Agent / RAG Study',
       devopsTopic: devopsInput || 'DevOps & Pure Python Practice',

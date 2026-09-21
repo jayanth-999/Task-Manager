@@ -1,5 +1,6 @@
 import type { Recipe, GroceryItem } from '../types';
 import { addLocalDays, getLocalDateString } from './dateUtils';
+import { createId } from './idUtils';
 
 export const BUILTIN_RECIPES: Recipe[] = [
   {
@@ -92,7 +93,7 @@ export class RecipeService {
     selected.forEach(r => {
       r.ingredients?.forEach(ing => {
         items.push({
-          id: crypto.randomUUID(),
+          id: createId(),
           user_id: 'guest',
           name: ing.name,
           quantity: `${ing.quantity} ${ing.unit}`,

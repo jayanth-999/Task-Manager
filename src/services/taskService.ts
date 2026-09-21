@@ -4,6 +4,7 @@ import { RoadmapService } from './roadmapService';
 import { calculateActiveStreak, dateKey, addLocalDays, parseLocalDate, getLocalDateString } from './dateUtils';
 import { getPreferences } from './userPreferences';
 import { throwIfSupabaseError } from './supabaseResult';
+import { createId } from './idUtils';
 import type { Task, Priority, TaskStatus } from '../types';
 
 export function formatTimeLabel(timeStr: string): string {
@@ -537,7 +538,7 @@ export class TaskService {
           }
 
           const isMilestoneTarget = rec.category === 'learning' && activeMilestone;
-          const occurrenceId = crypto.randomUUID();
+          const occurrenceId = createId();
           const instantiated: Task = {
             id: occurrenceId,
             user_id: userId,
@@ -557,7 +558,7 @@ export class TaskService {
             is_recurring: false, // Occurrences are individual instances, NOT recurring templates!
             recurrence_rule: rec.recurrence_rule || 'FREQ=DAILY',
             subtasks: (rec.subtasks || []).map((s, idx) => ({
-              id: crypto.randomUUID(),
+              id: createId(),
               task_id: occurrenceId,
               user_id: userId,
               title: s.title,
@@ -621,7 +622,7 @@ export class TaskService {
     const now = new Date().toISOString();
     const starterTasks = routineTemplates.map((item, index): Task => ({
       ...item,
-      id: crypto.randomUUID(),
+      id: createId(),
       user_id: userId,
       title: item.category === 'learning' && activeMilestone && index === 5 ? `🎯 ${activeMilestone.milestone.title}` : item.title,
       milestone_id: item.category === 'learning' && activeMilestone && index === 5 ? activeMilestone.milestone.id : undefined,
@@ -659,7 +660,7 @@ export class TaskService {
     const now = new Date().toISOString();
     const starterTasks = routineTemplates.map((item, index): Task => ({
       ...item,
-      id: crypto.randomUUID(),
+      id: createId(),
       user_id: userId,
       title: item.category === 'learning' && activeMilestone && index === 5 ? `🎯 ${activeMilestone.milestone.title}` : item.title,
       milestone_id: item.category === 'learning' && activeMilestone && index === 5 ? activeMilestone.milestone.id : undefined,
@@ -707,7 +708,7 @@ export class TaskService {
   // Create a new task (strictly assigning to taskPartial.due_date)
   static async createTask(userId: string, taskPartial: Partial<Task>): Promise<Task> {
     const newTask: Task = {
-      id: crypto.randomUUID(),
+      id: createId(),
       user_id: userId,
       title: taskPartial.title || 'Untitled Task',
       description: taskPartial.description || '',

@@ -6,6 +6,20 @@ interface BottomNavProps {
   onTabChange: (tab: string) => void;
 }
 
+const TAB_AREA_COLORS: Record<string, { color: string; bg: string }> = {
+  today: { color: 'var(--area-today, #3b82f6)', bg: 'rgba(59, 130, 246, 0.15)' },
+  tasks: { color: 'var(--area-tasks, #94a3b8)', bg: 'rgba(148, 163, 184, 0.15)' },
+  roadmaps: { color: 'var(--area-roadmaps, #8b5cf6)', bg: 'rgba(139, 92, 246, 0.15)' },
+  habits: { color: 'var(--area-habits, #14b8a6)', bg: 'rgba(20, 184, 166, 0.15)' },
+  focus: { color: 'var(--area-focus, #f97316)', bg: 'rgba(249, 115, 22, 0.15)' },
+  learning: { color: 'var(--area-learning, #06b6d4)', bg: 'rgba(6, 182, 212, 0.15)' },
+  fitness: { color: 'var(--area-fitness, #10b981)', bg: 'rgba(16, 185, 129, 0.15)' },
+  recipes: { color: 'var(--area-recipes, #f43f5e)', bg: 'rgba(244, 63, 94, 0.15)' },
+  investment: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+  errands: { color: 'var(--area-errands, #eab308)', bg: 'rgba(234, 179, 8, 0.15)' },
+  settings: { color: 'var(--area-settings, #94a3b8)', bg: 'rgba(148, 163, 184, 0.15)' },
+};
+
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const items = [
@@ -36,7 +50,26 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
             {guideItems.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
-              return <button key={item.id} type="button" onClick={() => { onTabChange(item.id); setIsMoreOpen(false); }} className={isActive ? 'btn-primary' : 'btn-secondary'} style={{ minHeight: '64px', flexDirection: 'column', justifyContent: 'center', gap: '0.25rem', fontSize: '0.72rem' }}><Icon size={18} />{item.label}</button>;
+              const theme = TAB_AREA_COLORS[item.id] || { color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.15)' };
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => { onTabChange(item.id); setIsMoreOpen(false); }}
+                  className={isActive ? 'btn-primary' : 'btn-secondary'}
+                  style={{
+                    minHeight: '64px',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    gap: '0.25rem',
+                    fontSize: '0.72rem',
+                    borderColor: isActive ? theme.color : undefined,
+                  }}
+                >
+                  <Icon size={18} color={isActive ? '#fff' : theme.color} />
+                  {item.label}
+                </button>
+              );
             })}
           </div>
         </div>
@@ -45,6 +78,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
       {items.map(item => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
+        const theme = TAB_AREA_COLORS[item.id] || { color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.15)' };
         return (
           <button
             key={item.id}
@@ -56,15 +90,29 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+              color: isActive ? theme.color : 'var(--text-muted)',
               fontSize: '0.75rem',
               gap: '2px',
               cursor: 'pointer',
               flex: 1,
+              position: 'relative',
+              paddingBottom: '4px',
             }}
           >
-            <Icon size={20} color={isActive ? 'var(--accent-primary)' : 'var(--text-muted)'} />
+            <Icon size={20} color={isActive ? theme.color : 'var(--text-muted)'} />
             <span style={{ fontWeight: isActive ? 600 : 400 }}>{item.label}</span>
+            {isActive && (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: '1px',
+                  width: '16px',
+                  height: '2.5px',
+                  borderRadius: '2px',
+                  background: theme.color,
+                }}
+              />
+            )}
           </button>
         );
       })}

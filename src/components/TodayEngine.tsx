@@ -36,6 +36,7 @@ interface TodayEngineProps {
   onMoveToNextDay: (taskId: string) => void;
   onResetRoutine: () => void;
   onRolloverOverdue?: () => void;
+  onOpenQuickCapture?: () => void;
   onNavigateTab: (tab: string) => void;
   selectedDate: string;
   onDateChange: (date: string) => void;
@@ -51,6 +52,7 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
   onMoveToNextDay,
   onResetRoutine,
   onRolloverOverdue,
+  onOpenQuickCapture,
   onNavigateTab,
   selectedDate,
   onDateChange,
@@ -363,8 +365,8 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
         </div>
       )}
 
-      {/* Empty state — when no tasks exist today, show a friendly CTA instead of 0 of 0 */}
-      {totalTasks === 0 && isToday && (
+      {/* When no tasks exist, show welcoming empty state with 3 prominent CTAs instead of lifestyle noise */}
+      {totalTasks === 0 ? (
         <div
           className="glass-panel"
           style={{
@@ -374,36 +376,65 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
             flexDirection: 'column',
             alignItems: 'center',
             gap: '1.2rem',
+            maxWidth: '640px',
+            margin: '1.5rem auto',
+            width: '100%',
           }}
         >
-          <div style={{ fontSize: '3.5rem', lineHeight: 1 }}>🎯</div>
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(59, 130, 246, 0.15)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--accent-primary)',
+            }}
+          >
+            <Calendar size={32} />
+          </div>
           <div>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.4rem' }}>Your day is a blank canvas</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '380px' }}>
-              Add your first task to get started, or load a starter routine to see how Apex organises your day.
+            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.4rem', color: 'var(--text-primary)' }}>
+              Your Day is Fresh & Clear
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '460px', lineHeight: 1.6 }}>
+              No tasks scheduled for {isToday ? 'today' : formatLocalDate(selectedDate)}. Start your day with intentional focus: add your top priorities, quick-capture thoughts, or load your customized routine for your {formatTimeLabel(workStart)} – {formatTimeLabel(workEnd)} shift.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', justifyContent: 'center', marginTop: '0.5rem' }}>
             <button
               onClick={() => {
-                const input = document.querySelector<HTMLInputElement>('[data-quickadd]');
+                const input = document.getElementById('today-quick-add-input') as HTMLInputElement | null;
                 input?.focus();
               }}
               className="btn-primary"
-              style={{ gap: '0.4rem', padding: '0.7rem 1.4rem' }}
+              style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              <Plus size={16} /> Add your first task
+              <Plus size={16} /> Add Your First Task
             </button>
             <button
               onClick={onResetRoutine}
               className="btn-secondary"
-              style={{ gap: '0.4rem', padding: '0.7rem 1.4rem' }}
+              style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem', borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              <RotateCcw size={16} /> Load starter routine
+              <RotateCcw size={16} /> Load Suggested Routine
             </button>
+            {onOpenQuickCapture && (
+              <button
+                onClick={onOpenQuickCapture}
+                className="btn-secondary"
+                style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Zap size={16} color="var(--accent-warning)" /> Quick Capture
+              </button>
+            )}
           </div>
         </div>
-      )}
+      ) : (
+        <>
 
       {/* Active Roadmap Target Banner (Connecting Goals to Today) */}
       {activeMilestoneInfo && (
@@ -481,22 +512,33 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
         </div>
       )}
 
-      {/* Core Shift & Routine Highlights with Interactive Quick-Jump Links */}
+      {/* Suggested Routine Guidelines */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.5px' }}>
+            Suggested Routine Guidelines
+          </span>
+          <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--accent-primary)', fontWeight: 600 }}>
+            Shift: {formatTimeLabel(workStart)} – {formatTimeLabel(workEnd)}
+          </span>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.8rem' }}>
         {/* Work Shift Card */}
         <div className="glass-card" style={{ borderLeft: '4px solid var(--accent-primary)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 700, textTransform: 'uppercase' }}>
-              Office Shift + Commute
+              Office Shift & Work Window
             </span>
             <Clock size={16} color="var(--accent-primary)" />
           </div>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>02:00 PM – 11:00 PM</h4>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{formatTimeLabel(workStart)} – {formatTimeLabel(workEnd)}</h4>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem 0' }}>
-            Includes 1:30 PM travel buffer & 11:00 PM return commute.
+            Includes travel buffer & return commute.
           </p>
           <div style={{ fontSize: '0.75rem', background: 'rgba(59, 130, 246, 0.15)', padding: '0.4rem 0.6rem', borderRadius: '6px', color: 'var(--text-primary)' }}>
-            🎯 <strong>1-Hour Tech Learning:</strong> 5:00 PM – 6:00 PM
+            🎯 <strong>1-Hour Tech Learning:</strong> {workStart >= '12:00' ? '5:00 PM – 6:00 PM' : '6:00 PM – 7:00 PM'}
           </div>
         </div>
 
@@ -529,7 +571,7 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
             </span>
             <Dumbbell size={16} color="var(--accent-success)" />
           </div>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>07:30 AM – 08:30 AM</h4>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{workStart >= '12:00' ? '07:30 AM – 08:30 AM' : '06:30 AM – 07:30 AM'}</h4>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem 0' }}>
             Home Bodyweight or Gym Equipment + Pre/Post Diet.
           </p>
@@ -550,9 +592,9 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
             </span>
             <Moon size={16} color="#38bdf8" />
           </div>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>12:00 AM – 07:00 AM</h4>
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700 }}>{workEnd >= '22:00' ? '12:00 AM – 07:00 AM' : '11:00 PM – 06:30 AM'}</h4>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.3rem 0 0.6rem 0' }}>
-            7 Hours dedicated sleep + 12:30 PM pre-work leisure time.
+            7 Hours dedicated sleep + pre-work leisure time.
           </p>
           <button
             onClick={() => onNavigateTab('investment')}
@@ -942,10 +984,13 @@ export const TodayEngine: React.FC<TodayEngineProps> = ({
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Quick Add Form at Bottom */}
       <form onSubmit={handleQuickAdd} className="glass-panel" style={{ padding: '0.8rem', display: 'flex', gap: '0.8rem' }}>
         <input
+          id="today-quick-add-input"
           type="text"
           data-quickadd="true"
           placeholder="Add custom task or routine item (e.g. Read 20 pages at 11:30 PM, Revise K8s networking)..."

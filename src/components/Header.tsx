@@ -98,6 +98,8 @@ export const Header: React.FC<HeaderProps> = ({
               ? 'Account & Cloud: Synced'
               : syncStatus === 'syncing'
               ? 'Account & Cloud: Syncing...'
+              : syncStatus === 'saved-locally'
+              ? 'Saved locally (Sync pending)'
               : syncStatus === 'offline'
               ? 'Account & Cloud: Offline'
               : syncStatus === 'error'
@@ -109,6 +111,8 @@ export const Header: React.FC<HeaderProps> = ({
             <Cloud size={14} color="var(--accent-success)" />
           ) : syncStatus === 'syncing' ? (
             <RefreshCw size={14} color="var(--accent-primary)" style={{ animation: 'spin 1.2s linear infinite' }} />
+          ) : syncStatus === 'saved-locally' ? (
+            <Cloud size={14} color="var(--accent-info, #06b6d4)" />
           ) : syncStatus === 'offline' ? (
             <CloudOff size={14} color="var(--accent-warning)" />
           ) : syncStatus === 'error' ? (

@@ -201,12 +201,16 @@ export class SyncEngine {
     const db = await getDB();
     await (db as any).delete(table, id);
     if (isCloudConfigured) {
+      updateSyncStatus('saved-locally');
       await (db as any).add('sync_queue', {
         table,
         operation: 'DELETE',
         data: { id },
         timestamp: Date.now(),
       });
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
+        SyncEngine.processSyncQueue();
+      }
     }
   }
 
@@ -299,5 +303,8 @@ export class SyncEngine {
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     SyncEngine.processSyncQueue();
+  });
+  window.addEventListener('offline', () => {
+    updateSyncStatus('offline');
   });
 }

@@ -3,6 +3,7 @@ import { supabase, isCloudConfigured } from './supabaseClient';
 import type { FocusSession } from '../types';
 import { throwIfSupabaseError } from './supabaseResult';
 import { getLocalDateString } from './dateUtils';
+import { createId } from './idUtils';
 
 export function calculateElapsedFocusMinutes(startedAt: Date, completedAt = new Date()): number {
   return Math.max(1, Math.round((completedAt.getTime() - startedAt.getTime()) / 60_000));
@@ -35,7 +36,7 @@ export class FocusService {
     notes?: string
   ): Promise<FocusSession> {
     const session: FocusSession = {
-      id: crypto.randomUUID(),
+      id: createId(),
       user_id: userId,
       task_id: taskId,
       duration_minutes: durationMinutes,

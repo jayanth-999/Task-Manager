@@ -588,6 +588,87 @@ describe('weekly recurrence and skip persistence in taskService', () => {
   });
 });
 
+describe('end-to-end task lifecycle and milestone integration', () => {
+  it('executes full task lifecycle: create -> in_progress -> completed -> blocked -> soft-delete -> restore', async () => {
+    const userId = `lifecycle-user-${Date.now()}`;
+    const today = dateKey();
+
+    // 1. Create task
+    const created = await TaskService.createTask(userId, {
+      title: 'Build CI/CD Pipeline',
+      due_date: today,
+      priority: 'high',
+      category: 'work',
+    });
+    expect(created.id).toBeDefined();
+    expect(created.status).toBe('todo');
+
+    // 2. Transition to in_progress
+    const inProgress = await TaskService.setTaskStatus(userId, created.id, 'in_progress');
+    expect(inProgress).toBeDefined();
+    expect(inProgress!.status).toBe('in_progress');
+
+    // 3. Transition to completed
+    const completed = await TaskService.setTaskStatus(userId, created.id, 'completed');
+    expect(completed).toBeDefined();
+    expect(completed!.status).toBe('completed');
+    expect(completed!.completed_at).toBeDefined();
+
+    // 4. Transition to blocked
+    const blocked = await TaskService.setTaskStatus(userId, created.id, 'blocked');
+    expect(blocked).toBeDefined();
+    expect(blocked!.status).toBe('blocked');
+
+    // 5. Soft-delete
+    await TaskService.deleteTask(userId, created.id);
+    const activeTasks = await TaskService.getTasks(userId, today);
+    expect(activeTasks.some(t => t.id === created.id)).toBe(false);
+
+    // 6. Restore
+    const restored = await TaskService.restoreTask(userId, created.id);
+    expect(restored?.deleted_at).toBeUndefined();
+    const tasksAfterRestore = await TaskService.getTasks(userId, today);
+    expect(tasksAfterRestore.some(t => t.id === created.id)).toBe(true);
+  });
+
+  it('creates and persists milestone task in today checklist with RoadmapService.linkMilestoneToDailyTask', async () => {
+    const userId = `milestone-user-${Date.now()}`;
+    const today = dateKey();
+
+    const roadmap = await RoadmapService.createRoadmapFromData(userId, {
+      title: 'Kubernetes Mastery',
+      duration_months: 3,
+      is_primary: true,
+      phases: [{
+        title: 'Phase 1 - Container Orchestration',
+        milestones: [{ title: 'Deploy Kubernetes Cluster with Helm', target_day: 5 }],
+      }],
+    });
+
+    const milestone = roadmap.phases![0].milestones![0];
+    expect(milestone).toBeDefined();
+
+    const task = await RoadmapService.linkMilestoneToDailyTask(
+      userId,
+      milestone.id,
+      today
+    );
+
+    expect(task).toBeDefined();
+    expect(task!.id).toBeDefined();
+    expect(task!.milestone_id).toBe(milestone.id);
+    expect(task!.due_date).toBe(today);
+    expect(task!.category).toBe('learning');
+    expect(task!.status).toBe('todo');
+
+    // Verify retrieval from local tasks
+    const stored = await SyncEngine.getLocalItem<Task>('tasks', task!.id);
+    expect(stored).toBeDefined();
+    expect(stored?.title).toContain('Deploy Kubernetes Cluster with Helm');
+    expect(stored?.milestone_id).toBe(milestone.id);
+  });
+});
+
 
 
 

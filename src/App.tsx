@@ -53,7 +53,17 @@ export const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState<string>(
     getLocalDateString()
   );
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('apex_theme');
+      if (saved) return saved === 'dark';
+    } catch {}
+    return true;
+  });
+
+  useEffect(() => {
+    document.body.classList.toggle('light-theme', !isDarkMode);
+  }, [isDarkMode]);
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState<boolean>(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -333,8 +343,13 @@ export const App: React.FC = () => {
   };
 
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    document.body.classList.toggle('light-theme', isDarkMode);
+    setIsDarkMode(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('apex_theme', next ? 'dark' : 'light');
+      } catch {}
+      return next;
+    });
   };
 
   return (
@@ -377,6 +392,7 @@ export const App: React.FC = () => {
               onMoveToNextDay={handleMoveToNextDay}
               onResetRoutine={handleResetRoutine}
               onRolloverOverdue={handleRolloverOverdue}
+              onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
               onNavigateTab={handleTabChange}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}

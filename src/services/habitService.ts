@@ -3,6 +3,7 @@ import { supabase, isCloudConfigured } from './supabaseClient';
 import type { Habit, HabitLog } from '../types';
 import { calculateActiveStreak } from './dateUtils';
 import { throwIfSupabaseError } from './supabaseResult';
+import { createId } from './idUtils';
 
 export const DEFAULT_HABITS: Habit[] = [
   {
@@ -68,7 +69,7 @@ export class HabitService {
       const now = new Date().toISOString();
       const initialHabits: Habit[] = [
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           user_id: userId,
           name: 'Morning Workout & Hydration',
           frequency: 'daily',
@@ -79,7 +80,7 @@ export class HabitService {
           updated_at: now,
         },
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           user_id: userId,
           name: '1-Hour Tech Learning (DevOps + AI)',
           frequency: 'daily',
@@ -90,7 +91,7 @@ export class HabitService {
           updated_at: now,
         },
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           user_id: userId,
           name: '10-15 Min Market & Financial Study',
           frequency: 'daily',
@@ -147,7 +148,8 @@ export class HabitService {
         await SyncEngine.deleteLocalItem('habits', dupId);
         if (isCloudConfigured && userId !== 'guest-local-user') {
           try {
-            await supabase.from('habits').delete().eq('id', dupId).eq('user_id', userId);
+            const res = await supabase.from('habits').delete().eq('id', dupId).eq('user_id', userId);
+            throwIfSupabaseError(res);
           } catch (err) {
             console.warn('Queued habit dedup delete for sync:', err);
           }
@@ -238,7 +240,7 @@ export class HabitService {
     }
 
     const newHabit: Habit = {
-      id: crypto.randomUUID(),
+      id: createId(),
       user_id: userId,
       name: trimmed,
       frequency,
@@ -277,7 +279,7 @@ export class HabitService {
     } else {
       // Add completion log
       const newLog: HabitLog = {
-        id: crypto.randomUUID(),
+        id: createId(),
         habit_id: habitId,
         user_id: userId,
         completed_date: targetDate,

@@ -78,3 +78,20 @@ DROP TRIGGER IF EXISTS trigger_profiles_updated_at ON public.profiles;
 CREATE TRIGGER trigger_profiles_updated_at
 BEFORE UPDATE ON public.profiles
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- 5. Habits table enhancements
+ALTER TABLE public.habits
+ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ DEFAULT NULL;
+
+-- 6. Focus sessions table enhancements
+ALTER TABLE public.focus_sessions
+ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- 7. Tasks milestone_id flexibility for offline-first syncing
+ALTER TABLE public.tasks
+DROP CONSTRAINT IF EXISTS tasks_milestone_id_fkey;
+
+ALTER TABLE public.tasks
+ALTER COLUMN milestone_id TYPE TEXT
+USING milestone_id::text;
+

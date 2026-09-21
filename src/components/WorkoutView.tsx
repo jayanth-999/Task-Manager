@@ -4,19 +4,33 @@ import type { WorkoutMode } from '../types';
 import { WORKOUT_TEMPLATES, DIET_GUIDE } from '../services/workoutService';
 
 export const WorkoutView: React.FC = () => {
-  const [mode, setMode] = useState<WorkoutMode>('home');
+  const [mode, setMode] = useState<WorkoutMode>(() => {
+    try {
+      const saved = localStorage.getItem('apex_workout_mode');
+      if (saved === 'home' || saved === 'gym') return saved;
+    } catch {}
+    return 'home';
+  });
+
+  const handleModeChange = (newMode: WorkoutMode) => {
+    setMode(newMode);
+    try {
+      localStorage.setItem('apex_workout_mode', newMode);
+    } catch {}
+  };
+
   const template = WORKOUT_TEMPLATES.find(t => t.mode === mode) || WORKOUT_TEMPLATES[0];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-      {/* Read-Only Banner */}
+      {/* Routine & Diet Guide Banner */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '0.6rem',
         padding: '0.7rem 1rem', borderRadius: 'var(--radius-sm)',
-        background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)',
-        fontSize: '0.82rem', color: 'var(--accent-warning)',
+        background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+        fontSize: '0.82rem', color: 'var(--accent-success)',
       }}>
-        📖 <strong>Reference Guide</strong> — Changes here are temporary and won't be saved across page refreshes.
+        🏋️‍♂️ <strong>Routine & Diet Guide</strong> — Selected workout mode is saved automatically on this device.
       </div>
       {/* Header & Mode Switcher */}
       <div className="glass-panel" style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.8rem' }}>
@@ -31,14 +45,14 @@ export const WorkoutView: React.FC = () => {
         <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--bg-secondary)', padding: '0.3rem', borderRadius: 'var(--radius-sm)' }}>
           <button
             className={mode === 'home' ? 'btn-primary' : 'btn-secondary'}
-            onClick={() => setMode('home')}
+            onClick={() => handleModeChange('home')}
             style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
           >
             <Home size={16} /> Home Workout Day
           </button>
           <button
             className={mode === 'gym' ? 'btn-primary' : 'btn-secondary'}
-            onClick={() => setMode('gym')}
+            onClick={() => handleModeChange('gym')}
             style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
           >
             <Dumbbell size={16} /> Gym Workout Day

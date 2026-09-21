@@ -20,6 +20,20 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
 }
 
+const TAB_AREA_COLORS: Record<string, { color: string; bg: string }> = {
+  today: { color: 'var(--area-today, #3b82f6)', bg: 'rgba(59, 130, 246, 0.15)' },
+  tasks: { color: 'var(--area-tasks, #94a3b8)', bg: 'rgba(148, 163, 184, 0.15)' },
+  roadmaps: { color: 'var(--area-roadmaps, #8b5cf6)', bg: 'rgba(139, 92, 246, 0.15)' },
+  habits: { color: 'var(--area-habits, #14b8a6)', bg: 'rgba(20, 184, 166, 0.15)' },
+  focus: { color: 'var(--area-focus, #f97316)', bg: 'rgba(249, 115, 22, 0.15)' },
+  learning: { color: 'var(--area-learning, #06b6d4)', bg: 'rgba(6, 182, 212, 0.15)' },
+  fitness: { color: 'var(--area-fitness, #10b981)', bg: 'rgba(16, 185, 129, 0.15)' },
+  recipes: { color: 'var(--area-recipes, #f43f5e)', bg: 'rgba(244, 63, 94, 0.15)' },
+  investment: { color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+  errands: { color: 'var(--area-errands, #eab308)', bg: 'rgba(234, 179, 8, 0.15)' },
+  settings: { color: 'var(--area-settings, #94a3b8)', bg: 'rgba(148, 163, 184, 0.15)' },
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const [guidesOpen, setGuidesOpen] = useState(false);
 
@@ -59,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       {coreItems.map(item => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
+        const theme = TAB_AREA_COLORS[item.id] || { color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.15)' };
         return (
           <button
             key={item.id}
@@ -70,7 +85,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               padding: '0.65rem 0.9rem',
               borderRadius: 'var(--radius-sm)',
               border: 'none',
-              background: isActive ? 'var(--accent-gradient)' : 'transparent',
+              borderLeft: isActive ? `3px solid ${theme.color}` : '3px solid transparent',
+              background: isActive ? theme.bg : 'transparent',
               color: isActive ? '#ffffff' : 'var(--text-secondary)',
               fontWeight: isActive ? 600 : 400,
               cursor: 'pointer',
@@ -79,7 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               width: '100%',
             }}
           >
-            <Icon size={18} color={isActive ? '#fff' : 'var(--text-secondary)'} />
+            <Icon size={18} color={isActive ? theme.color : 'var(--text-secondary)'} />
             <span style={{ fontSize: '0.9rem' }}>{item.label}</span>
           </button>
         );
@@ -115,6 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           {guideItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const theme = TAB_AREA_COLORS[item.id] || { color: 'var(--accent-primary)', bg: 'rgba(59, 130, 246, 0.15)' };
             return (
               <button
                 key={item.id}
@@ -126,8 +143,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                   padding: '0.55rem 0.9rem',
                   borderRadius: 'var(--radius-sm)',
                   border: 'none',
-                  background: isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                  color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                  borderLeft: isActive ? `3px solid ${theme.color}` : '3px solid transparent',
+                  background: isActive ? theme.bg : 'transparent',
+                  color: isActive ? theme.color : 'var(--text-muted)',
                   fontWeight: isActive ? 600 : 400,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
@@ -135,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                   width: '100%',
                 }}
               >
-                <Icon size={16} color={isActive ? 'var(--accent-primary)' : 'var(--text-muted)'} />
+                <Icon size={16} color={isActive ? theme.color : 'var(--text-muted)'} />
                 <span style={{ fontSize: '0.85rem' }}>{item.label}</span>
               </button>
             );
@@ -155,6 +173,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           padding: '0.65rem 0.9rem',
           borderRadius: 'var(--radius-sm)',
           border: 'none',
+          borderLeft: activeTab === 'settings' ? '3px solid var(--area-settings, #94a3b8)' : '3px solid transparent',
           background: activeTab === 'settings' ? 'rgba(148,163,184,0.15)' : 'transparent',
           color: activeTab === 'settings' ? 'var(--text-primary)' : 'var(--text-muted)',
           fontWeight: activeTab === 'settings' ? 600 : 400,
@@ -164,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
           width: '100%',
         }}
       >
-        <Settings size={17} color={activeTab === 'settings' ? 'var(--text-primary)' : 'var(--text-muted)'} />
+        <Settings size={17} color={activeTab === 'settings' ? 'var(--area-settings, #94a3b8)' : 'var(--text-muted)'} />
         <span style={{ fontSize: '0.9rem' }}>Settings</span>
       </button>
     </aside>

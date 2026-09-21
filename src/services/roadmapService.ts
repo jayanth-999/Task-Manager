@@ -3,6 +3,7 @@ import { supabase, isCloudConfigured } from './supabaseClient';
 import type { Task, Roadmap, RoadmapPhase, RoadmapMilestone } from '../types';
 import { throwIfSupabaseError } from './supabaseResult';
 import { getLocalDateString } from './dateUtils';
+import { createId } from './idUtils';
 
 export interface RoadmapImport {
   title: string;
@@ -253,10 +254,10 @@ export class RoadmapService {
     const endDate = new Date();
     endDate.setMonth(endDate.getMonth() + input.duration_months);
 
-    const roadmapId = crypto.randomUUID();
+    const roadmapId = createId();
 
     const phases: RoadmapPhase[] = input.phases.map((p, pIdx) => {
-      const phaseId = crypto.randomUUID();
+      const phaseId = createId();
       return {
         id: phaseId,
         roadmap_id: roadmapId,
@@ -267,7 +268,7 @@ export class RoadmapService {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         milestones: p.milestones.map((m, mIdx) => ({
-          id: crypto.randomUUID(),
+          id: createId(),
           phase_id: phaseId,
           user_id: userId,
           title: m.title,
@@ -408,7 +409,7 @@ export class RoadmapService {
     if (existing) return existing;
 
     const newTask: Task = {
-      id: crypto.randomUUID(),
+      id: createId(),
       user_id: userId,
       title: `🎯 ${targetMilestone.title}`,
       description: `Roadmap Target from "${targetRoadmap?.title || 'Career Goal'}"`,
@@ -428,7 +429,8 @@ export class RoadmapService {
 
     if (isCloudConfigured && userId !== 'guest-local-user') {
       try {
-        await supabase.from('tasks').insert(newTask);
+        const res = await supabase.from('tasks').insert(newTask);
+        throwIfSupabaseError(res);
       } catch (err) {
         console.warn('Queued roadmap milestone task sync:', err);
       }

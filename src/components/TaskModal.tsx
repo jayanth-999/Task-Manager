@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, Plus, Check } from 'lucide-react';
 import type { Task, Priority } from '../types';
+import { createId } from '../services/idUtils';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -93,7 +94,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleAddSubtask = () => {
     if (!newSubtask.trim()) return;
-    setSubtasks(prev => [...prev, { id: crypto.randomUUID(), title: newSubtask.trim(), is_completed: false }]);
+    setSubtasks(prev => [...prev, { id: createId(), title: newSubtask.trim(), is_completed: false }]);
     setNewSubtask('');
   };
 
